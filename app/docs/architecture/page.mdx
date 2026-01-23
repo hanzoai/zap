@@ -1,0 +1,94 @@
+
+# Architecture
+
+ZAP is designed around capability-based security and zero-copy performance.
+
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Agent (speaks ZAP)                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│                     ZAP Gateway                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   Catalog   │  │ Coordination│  │    Tool Router      │  │
+│  │  (unified)  │  │  (Lux cons) │  │ (load-bal/failover) │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└──────┬─────────────────┬─────────────────┬──────────────────┘
+       │                 │                 │
+┌──────▼─────┐    ┌──────▼─────┐    ┌──────▼─────┐
+│ MCP Server │    │ MCP Server │    │ MCP Server │
+│  (GitHub)  │    │  (Slack)   │    │ (Postgres) │
+└────────────┘    └────────────┘    └────────────┘
+```
+
+## Design Principles
+
+### 1. Zero-copy by Default
+
+Cap'n Proto messages are read without decoding/rehydrating object graphs. The wire format IS the memory format.
+
+### 2. Capability-secure
+
+Object references, not ambient authority. Agents receive only the capabilities they need.
+
+### 3. MCP-adjacent
+
+Familiar primitives (tools/resources/prompts) for easy migration.
+
+### 4. Consensus-first
+
+Multi-agent agreement is a primitive, not an afterthought.
+
+### 5. Effect-aware
+
+Operations declare their side-effect level:
+- **Pure** — No side effects, deterministic, cacheable
+- **Deterministic** — Side effects, but reproducible
+- **Nondeterministic** — May vary between calls
+
+### 6. Low-allocation
+
+Minimize heap allocations on hot paths.
+
+## Core Interface
+
+```text
+interface Zap {
+    // Bootstrap
+    initialize(hello: Hello) -> Welcome
+
+    // Canonical tools (drop-in Claude Code replacements)
+    fs() -> Fs              // Read, Write, Edit, Glob
+    proc() -> Proc          // Bash
+    vcs() -> Vcs            // Git operations
+    code() -> Code          // AST, symbols
+    net() -> Net            // WebFetch, WebSearch
+    repl() -> Repl          // Interactive sessions
+    notebook() -> Notebook  // Jupyter
+    browser() -> Browser    // DevTools
+    agent() -> Agent        // Task (sub-agents)
+    user() -> User          // AskUserQuestion, TodoWrite
+
+    // MCP-adjacent primitives
+    resources() -> Resources
+    prompts() -> Prompts
+
+    // Mesh layer (capability aggregation)
+    catalog() -> Catalog
+    coordination() -> Coordination
+    mesh() -> Mesh
+    gateway() -> Gateway
+}
+```
+
+## Naming Conventions
+
+| Component | Purpose |
+|-----------|---------|
+| `zapd` | Daemon/router (the unified ZAP server) |
+| `zapctl` | CLI |
+| `zaplink` | Adapters (MCP↔ZAP bridges) |
+| `zapmesh` | Agent swarm fabric |

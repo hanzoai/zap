@@ -1,0 +1,143 @@
+
+# Rust API
+
+ZAP provides a high-level Rust API so users don't need to know Cap'n Proto.
+
+## Installation
+
+```toml
+[dependencies]
+hanzo-zap = "0.2"
+```
+
+## Client
+
+```rust
+use hanzo_zap::{Client, Effect};
+
+// Connect to a ZAP endpoint
+let client = Client::connect("zap://localhost:9999").await?;
+
+// Use canonical tools (like Claude Code)
+let fs = client.fs().await?;
+let content = fs.read("/etc/hosts", None, None, ctx).await?;
+
+// Interactive REPL
+let repl = client.repl().await?;
+let session = repl.start("python", "/workspace", ctx).await?;
+let result = repl.eval(&session.id, "print('hello')", ctx).await?;
+
+// Browser automation
+let browser = client.browser().await?;
+browser.connect("http://localhost:9222", ctx).await?;
+let pages = browser.pages(ctx).await?;
+browser.navigate(&pages[0].id, "https://example.com", ctx).await?;
+let output = browser.eval(&pages[0].id, "document.title", ctx).await?;
+```
+
+## Server
+
+```rust
+use hanzo_zap::{Endpoint, FsImpl, ProcImpl};
+
+// Create a ZAP endpoint
+let endpoint = Endpoint::builder()
+    .with_fs(FsImpl::default())
+    .with_proc(ProcImpl::default())
+    .with_repl(ReplImpl::default())
+    .build()?;
+
+// Serve on TCP
+endpoint.serve("0.0.0.0:9999").await?;
+
+// Or Unix socket
+endpoint.serve_unix("/tmp/zap.sock").await?;
+```
+
+## Catalog
+
+```rust
+// Unified tool discovery
+let catalog = client.catalog().await?;
+let tools = catalog.list_tools(true, ctx).await?;  // certified only
+
+// Search tools
+let matches = catalog.search("github", ctx).await?;
+
+// Invoke any tool
+let result = catalog.invoke(&tool_id, &args, ctx).await?;
+```
+
+## Gateway
+
+```rust
+// Dynamic MCP server registration
+let gateway = client.gateway().await?;
+gateway.register_mcp_server("github", "stdio://gh-mcp", ctx).await?;
+gateway.register_mcp_server("slack", "http://localhost:8080", ctx).await?;
+
+// Call MCP tools through gateway
+let result = gateway.call_mcp_tool("github.search_repos", r#"{"query": "rust"}"#, ctx).await?;
+```
+
+## Consensus
+
+```rust
+// LLM Committee consensus
+let coord = client.coordination().await?;
+let (answer, cert) = coord.committee(
+    "What's the best approach?",
+    &["agent-1", "agent-2", "agent-3"],
+    config,
+    ctx
+).await?;
+```
+
+## Transport URIs
+
+```rust
+// TCP
+Client::connect("zap://host:port").await?;
+
+// Unix socket
+Client::connect("zap+unix:///path/to/socket").await?;
+
+// TLS
+Client::connect("zap+tls://host:port").await?;
+
+// QUIC
+Client::connect("zap+quic://host:port").await?;
+
+// Shared memory (in-process)
+Client::connect("zap+mem://segment").await?;
+
+// Stdio (subprocess)
+Client::connect("zap+stdio://").await?;
+```
+
+## Error Handling
+
+```rust
+use hanzo_zap::ZapError;
+
+match result {
+    Ok(data) => println!("Success: {:?}", data),
+    Err(ZapError::NotFound(msg)) => eprintln!("Not found: {}", msg),
+    Err(ZapError::Permission(msg)) => eprintln!("Permission denied: {}", msg),
+    Err(ZapError::Timeout) => eprintln!("Operation timed out"),
+    Err(e) => eprintln!("Error: {}", e),
+}
+```
+
+## Effects
+
+```rust
+use hanzo_zap::Effect;
+
+// Check tool effect level
+match tool.effect {
+    Effect::Pure => println!("Safe to cache"),
+    Effect::Deterministic => println!("Reproducible"),
+    Effect::Nondeterministic => println!("May vary"),
+}
+```

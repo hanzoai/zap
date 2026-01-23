@@ -1,0 +1,124 @@
+
+# Consensus
+
+ZAP includes native consensus primitives for multi-agent coordination.
+
+## Coordination Interface
+
+```text
+interface Coordination {
+    propose(topic: Data, proposal: Data, config: ConsensusConfig, ctx: CallContext)
+        -> ConsensusResult
+    sample(roundId: Text, k: UInt32, ctx: CallContext) -> List[Text]
+    vote(roundId: Text, vote: Data, confidence: Float64, ctx: CallContext) -> Bool
+    preference(roundId: Text, ctx: CallContext) -> (winner: Data, confidence: Float64)
+    finalize(roundId: Text, ctx: CallContext) -> Certificate
+
+    // LLM Committee: ask-many, converge-one
+    committee(question: Text, participants: List[Text], config: ConsensusConfig, ctx: CallContext)
+        -> (answer: Text, certificate: Certificate)
+}
+```
+
+## LLM Committee Pattern
+
+The `committee` method implements the **ask-many, converge-one** pattern:
+
+1. Send question to all participants
+2. Collect responses with confidence scores
+3. Run consensus rounds to converge
+4. Return final answer with certificate
+
+```rust
+let coord = client.coordination().await?;
+let (answer, cert) = coord.committee(
+    "What's the best approach for implementing this feature?",
+    &["agent-1", "agent-2", "agent-3"],
+    ConsensusConfig {
+        rounds: 10,
+        threshold: 0.8,
+        timeout_ms: 5000,
+    },
+    ctx
+).await?;
+
+println!("Consensus answer: {}", answer);
+println!("Certificate: {:?}", cert);
+```
+
+## Metastable Consensus
+
+ZAP uses Lux's metastable consensus algorithm:
+
+- **k-peer sampling**: Query random subset of peers
+- **Luminance weighting**: Weight votes by stake/reputation
+- **β₁/β₂ thresholds**: Accept when confidence crosses threshold
+- **Certificate finalization**: Cryptographic proof of consensus
+
+### Configuration
+
+```rust
+struct ConsensusConfig {
+    rounds: u32,        // Max consensus rounds (default: 10)
+    threshold: f64,     // Agreement threshold (default: 0.8)
+    timeout_ms: u64,    // Round timeout
+    k: u32,             // Sample size for peer sampling
+    beta1: f64,         // Soft threshold
+    beta2: f64,         // Hard threshold
+}
+```
+
+## Use Cases
+
+### Tool Selection
+
+```rust
+// Which tool should handle this request?
+let (tool, _) = coord.committee(
+    "Best tool for: 'search for files matching *.rs'",
+    &tool_providers,
+    config,
+    ctx
+).await?;
+```
+
+### Route Selection
+
+```rust
+// Which provider should serve this request?
+let (provider, cert) = coord.committee(
+    "Fastest provider for: github.search_repos",
+    &available_providers,
+    config,
+    ctx
+).await?;
+```
+
+### Quorum Execution
+
+```rust
+// Execute with 2-of-3 agreement
+let results = coord.propose(
+    "execute:critical_operation",
+    &args,
+    ConsensusConfig { threshold: 0.67, ..config },
+    ctx
+).await?;
+```
+
+## Certificates
+
+Consensus results include cryptographic certificates:
+
+```rust
+struct Certificate {
+    round_id: String,
+    topic_hash: [u8; 32],
+    result_hash: [u8; 32],
+    signatures: Vec<Signature>,
+    participants: Vec<PeerId>,
+    timestamp: u64,
+}
+```
+
+Certificates can be verified offline and used as proof of consensus.
