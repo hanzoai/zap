@@ -1,0 +1,75 @@
+
+# ZAP: Zero-copy Agent Protocol
+
+**Version 0.2.1 (Cap'n Proto RPC Edition)**
+**Hanzo AI — January 2026**
+
+
+## 1. Introduction
+
+### 1.1 The Problem with MCP
+
+The Model Context Protocol (MCP) was designed for human-AI interaction using JSON-RPC. For agent swarms coordinating in real-time, JSON-RPC has fundamental limitations:
+
+1. **Serialization overhead**: JSON parsing adds 100-500μs per message
+2. **Verbose wire format**: ~40% message overhead from JSON encoding
+3. **Runtime schema validation**: Silent failures, no compile-time checking
+4. **No capability security**: Ambient auth model, no object capabilities
+5. **Weak streaming**: Bolted-on, not first-class
+6. **No native consensus**: Multi-agent agreement requires external coordination
+
+### 1.2 The ZAP Solution
+
+ZAP replaces JSON-RPC entirely with Cap'n Proto RPC:
+
+| Feature | MCP (JSON-RPC) | ZAP (capnp-rpc) |
+|---------|----------------|-----------------|
+| Wire format | JSON | Cap'n Proto |
+| Serialization | O(n) parse time | Zero-copy |
+| Schema | Runtime validation | Compile-time types |
+| Message overhead | ~40% | ~5% |
+| Security model | Ambient auth | Capability-based |
+| Streaming | Bolted-on | First-class (capabilities) |
+| Pipelining | None | Native promise pipelining |
+| Consensus | External | Native (metastable) |
+| Latency (local) | ~500μs | sub-1μs |
+| Tool discovery | Per-server | Unified Catalog |
+| Multi-agent | External | Native Coordination |
+
+
+## 3. Cost Analysis
+
+### 3.1 The Killer: Duplicated Server Processes
+
+If a dev runs 20 MCP servers per agent:
+- **100 agents** ⇒ 2,000 server processes
+- **1,000 agents** ⇒ 20,000 server processes
+
+**Memory back-of-napkin:**
+Let RSS per MCP server be 100–300 MB. Then:
+- 2,000 servers ⇒ 200–600 GB RAM
+- 20,000 servers ⇒ 2–6 TB RAM
+
+With ZAP:
+- 20 shared tool backends once (or a few replicas)
+- Agents are mostly clients + small local state
+
+**O(agents × tools) processes → O(tools + agents) connections**
+
+### 3.2 Cost Example
+
+**MCP-style duplicated servers (100 agents × 20 servers = 2,000 services)**
+- Each server: 0.25 GiB + 0.1 vCPU reserved
+- Total: 500 GiB memory, 200 vCPU
+
+**ZAP-style shared backends (20 connectors total)**
+- Each connector: 0.5 GiB + 0.25 vCPU
+- Total: 10 GiB memory, 5 vCPU
+
+**Ratio: ~40-50× lower infrastructure spend**
+
+
+## 5. Schema
+
+See `/rust/schema/zap.zap` for the complete Cap'n Proto schema (~1400 lines).
+

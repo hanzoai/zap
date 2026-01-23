@@ -1,0 +1,65 @@
+
+# ZAP: Zero-copy Agent Protocol
+
+**"One ZAP endpoint to rule all MCP servers."**
+
+ZAP is the **MCP Killer**—a single ZAP server that auto-wraps any number of MCP servers into one unified, consensus-aware, zero-copy tool mesh. Agents speak ZAP once; everything else is implementation detail.
+
+## Why ZAP?
+
+MCP made tool integration easy — but JSON everywhere doesn't scale.
+
+| Problem | MCP | ZAP |
+|---------|-----|-----|
+| Protocol sprawl | N MCP clients for N servers | 1 ZAP client, infinite tools |
+| Serialization | O(n) JSON parse time | Zero-copy |
+| Memory | Full copy per message | Wire format = memory format |
+| Latency | ~500μs local | less than 1μs local |
+| Security | Ambient auth | Capability-based |
+| Consensus | External | Native (Lux metastable) |
+
+## Quick Start
+
+```bash
+# Install ZAP daemon
+cargo install zapd
+
+# Start the gateway
+zapd serve --port 9999
+
+# Add MCP servers
+zapd add mcp --name github --url stdio://gh-mcp
+zapd add mcp --name slack --url http://localhost:8080
+zapd add mcp --name db --url zap+unix:///tmp/postgres.sock
+
+# Agents connect once
+# zap://localhost:9999 → 47 tools from 3 servers, unified
+```
+
+## The Math
+
+If you run 20 MCP servers per agent:
+- **100 agents** = 2,000 server processes = 200-600 GB RAM
+- **1,000 agents** = 20,000 server processes = 2-6 TB RAM
+
+With ZAP:
+- 20 shared tool backends (or a few replicas)
+- Agents are clients + small local state
+- **O(agents × tools)** processes → **O(tools + agents)** connections
+
+**Result: 40-50x lower infrastructure costs.**
+
+## Features
+
+- **Drop-in Claude Code replacement** — All canonical tools (Read, Write, Bash, etc.)
+- **Capability aggregation layer** — Unified Catalog across all MCP servers
+- **Consensus-backed routing** — Lux metastable consensus for stable discovery
+- **Zero-copy performance** — Wire format = memory format
+- **REPL/Notebook/Browser** — Interactive environments for any language
+
+## Next Steps
+
+- [Whitepaper](/docs/whitepaper) - Full protocol specification
+- [Architecture](/docs/architecture) - System design
+- [Tools Reference](/docs/tools) - All canonical tools
+- [Gateway](/docs/gateway) - MCP aggregation

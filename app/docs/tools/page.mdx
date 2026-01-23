@@ -1,0 +1,105 @@
+
+# Tools Reference
+
+ZAP provides drop-in replacements for all Claude Code tools plus additional capabilities.
+
+## Claude Code Mapping
+
+| Claude Code Tool | ZAP Interface | ZAP Methods |
+|------------------|---------------|-------------|
+| `Read` | `Fs` | `read(path, offset, limit)` |
+| `Write` | `Fs` | `write(path, content)` |
+| `Edit` | `Fs` | `edit(path, edits[])` |
+| `Glob` | `Fs` | `glob(pattern, path)` |
+| `Grep` | `Fs` | `grep(pattern, path, options)` |
+| `Bash` | `Proc` | `run(command, cwd, env, timeout)` |
+| `WebFetch` | `Net` | `fetch(url, method, headers, body)` |
+| `WebSearch` | `Net` | `search(query, engine, maxResults)` |
+| `Task` | `Agent` | `spawn(type, prompt, config)` |
+| `AskUserQuestion` | `User` | `ask(questions[])` |
+| `TodoWrite` | `User` | `todo(action, items[])` |
+| `NotebookEdit` | `Notebook` | `editCell(path, cellId, source)` |
+
+## Fs — Filesystem
+
+```text
+interface Fs {
+    read(path: Text, offset: UInt64, limit: UInt64, ctx: CallContext) -> (content: Data, encoding: Text)
+    write(path: Text, content: Data, ctx: CallContext) -> UInt64
+    edit(path: Text, edits: List[Edit], ctx: CallContext) -> Bool
+    glob(pattern: Text, path: Text, ctx: CallContext) -> List[FileInfo]
+    grep(pattern: Text, path: Text, options: GrepOptions, ctx: CallContext) -> List[GrepMatch]
+    stat(path: Text, ctx: CallContext) -> FileInfo
+    mkdir(path: Text, recursive: Bool, ctx: CallContext) -> Bool
+    rm(path: Text, recursive: Bool, ctx: CallContext) -> Bool
+    mv(src: Text, dst: Text, ctx: CallContext) -> Bool
+    cp(src: Text, dst: Text, recursive: Bool, ctx: CallContext) -> Bool
+    tree(path: Text, depth: UInt32, ctx: CallContext) -> DirectoryTree
+    watch(path: Text, recursive: Bool) -> EventStream
+}
+```
+
+## Proc — Process Execution
+
+```text
+interface Proc {
+    run(command: Text, cwd: Text, env: List[EnvVar], timeout: UInt64, ctx: CallContext) -> ProcResult
+    bg(command: Text, cwd: Text, env: List[EnvVar], ctx: CallContext) -> Task
+    signal(taskId: Text, signal: Signal, ctx: CallContext) -> Bool
+    status(taskId: Text, ctx: CallContext) -> TaskStatus
+    wait(taskId: Text, ctx: CallContext) -> ProcResult
+    output(taskId: Text) -> EventStream
+    list(ctx: CallContext) -> List[TaskInfo]
+}
+```
+
+## Repl — Interactive Sessions
+
+Start interactive REPL sessions for any language:
+
+```text
+interface Repl {
+    start(language: Text, cwd: Text, ctx: CallContext) -> ReplSession
+    eval(sessionId: Text, code: Text, ctx: CallContext) -> ReplEvalResult
+    output(sessionId: Text) -> EventStream
+    input(sessionId: Text, text: Text, ctx: CallContext) -> ()
+    list(ctx: CallContext) -> List[ReplSession]
+    kill(sessionId: Text, ctx: CallContext) -> Bool
+    history(sessionId: Text, ctx: CallContext) -> List[Text]
+    interrupt(sessionId: Text, ctx: CallContext) -> Bool
+}
+```
+
+Supported languages: `node`, `python`, `ruby`, `lua`, `bash`, `zsh`, etc.
+
+## Browser — DevTools Protocol
+
+```text
+interface Browser {
+    connect(endpoint: Text, ctx: CallContext) -> Bool
+    pages(ctx: CallContext) -> List[BrowserPage]
+    navigate(pageId: Text, url: Text, ctx: CallContext) -> Bool
+    eval(pageId: Text, expression: Text, ctx: CallContext) -> EvalResult
+    console(pageId: Text) -> EventStream
+    screenshot(pageId: Text, format: Text, ctx: CallContext) -> Data
+    html(pageId: Text, ctx: CallContext) -> Text
+    querySelector(pageId: Text, selector: Text, ctx: CallContext) -> DomNode
+    click(pageId: Text, selector: Text, ctx: CallContext) -> Bool
+    type(pageId: Text, selector: Text, text: Text, ctx: CallContext) -> Bool
+}
+```
+
+## Notebook — Jupyter
+
+```text
+interface Notebook {
+    open(path: Text, ctx: CallContext) -> NotebookInfo
+    read(path: Text, ctx: CallContext) -> List[NotebookCell]
+    executeCell(path: Text, cellId: Text, ctx: CallContext) -> CellOutput
+    executeAll(path: Text, ctx: CallContext) -> Task
+    editCell(path: Text, cellId: Text, source: Text, ctx: CallContext) -> Bool
+    insertCell(path: Text, afterCellId: Text, cellType: CellType, source: Text, ctx: CallContext) -> Text
+    deleteCell(path: Text, cellId: Text, ctx: CallContext) -> Bool
+    restartKernel(path: Text, ctx: CallContext) -> Bool
+}
+```

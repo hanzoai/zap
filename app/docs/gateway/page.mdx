@@ -1,0 +1,95 @@
+
+# Gateway — The "MCP Killer"
+
+> **"One ZAP endpoint to rule all MCP servers."**
+
+ZAP Gateway replaces MCP sprawl with one consensus-backed tool plane.
+
+## How It Works
+
+### Ingest
+
+Adapter per MCP server normalizes to `ToolInfo`:
+- **Namespacing**: `mcp.<server>.<tool>`
+- **Schema**: MCP JSON schema stored as BlobRef
+- **Effects**: Inferred `effect`/`idempotent`/`replayable`
+- **Limits**: Optional pricing tags
+
+### Serve
+
+```text
+interface Gateway {
+    listMcpTools(ctx: CallContext) -> List[McpTool]
+    callMcpTool(name: Text, jsonArgs: Text, ctx: CallContext) -> Text
+    zapToMcp(content: List[ContentBlock]) -> Text
+    mcpToZap(json: Text) -> List[ContentBlock]
+
+    // Dynamic MCP server registration
+    registerMcpServer(name: Text, endpoint: Text, ctx: CallContext) -> Bool
+    unregisterMcpServer(name: Text, ctx: CallContext) -> Bool
+}
+```
+
+- `Catalog.listTools()` returns merged toolset
+- `Catalog.invoke()` routes call → MCP → result
+- Automatic streaming translation
+
+### Coordinate (Optional)
+
+Lux consensus rounds finalize:
+- `CatalogSnapshotHash`
+- Provider health / preferred routes
+- Quorum validation policies ("2-of-3 for this tool")
+
+## CLI Usage
+
+```bash
+# Start ZAP Gateway
+zapd serve --port 9999
+
+# Add MCP servers dynamically
+zapd add mcp --name github --url stdio://gh-mcp
+zapd add mcp --name slack --url http://localhost:8080
+zapd add mcp --name db --url zap+unix:///tmp/postgres.sock
+
+# List all tools
+zapctl tools list
+
+# Invoke a tool
+zapctl call mcp.github.search_repos --query "rust capnp"
+
+# Remove an MCP server
+zapd rm mcp --name slack
+```
+
+## Why It Beats MCP at Scale
+
+| Problem | MCP | ZAP Gateway |
+|---------|-----|-------------|
+| Protocol sprawl | N MCP clients for N servers | 1 ZAP client, infinite tools |
+| Streaming | Bespoke token/event plumbing per server | Unified streaming + backpressure |
+| Security | Secrets scattered across clients | Single boundary; attenuated capabilities |
+| Discovery | Per-server, can drift | Certified catalog snapshots (Lux consensus) |
+| Routing | Manual client config | Smart load-balance/failover/quorum-exec |
+| Memory | Full copy per message | Zero/low-copy; shared memory on-host |
+
+## Rust API
+
+```rust
+use hanzo_zap::{Client, Gateway};
+
+// Connect to ZAP
+let client = Client::connect("zap://localhost:9999").await?;
+let gateway = client.gateway().await?;
+
+// Register MCP servers
+gateway.register_mcp_server("github", "stdio://gh-mcp", ctx).await?;
+gateway.register_mcp_server("slack", "http://localhost:8080", ctx).await?;
+
+// Use unified catalog
+let catalog = client.catalog().await?;
+let tools = catalog.list_tools(true, ctx).await?;
+
+// Invoke any tool (MCP or native)
+let result = catalog.invoke(&tool_id, &args, ctx).await?;
+```

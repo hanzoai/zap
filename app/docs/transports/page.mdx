@@ -1,0 +1,117 @@
+
+# Transports
+
+ZAP supports multiple transport protocols via URI schemes.
+
+## URI Schemes
+
+| Scheme | Transport | Use Case |
+|--------|-----------|----------|
+| `zap://` | TCP | Remote servers |
+| `zap+unix://` | Unix socket | Local IPC |
+| `zap+tls://` | TLS over TCP | Secure remote |
+| `zap+quic://` | QUIC | High-performance remote |
+| `zap+mem://` | Shared memory | In-process |
+| `zap+stdio://` | Stdio | Subprocess |
+
+## Examples
+
+### TCP
+
+```rust
+// Server
+Endpoint::serve("0.0.0.0:9999").await?;
+
+// Client
+Client::connect("zap://localhost:9999").await?;
+```
+
+### Unix Socket
+
+```rust
+// Server
+Endpoint::serve_unix("/tmp/zap.sock").await?;
+
+// Client
+Client::connect("zap+unix:///tmp/zap.sock").await?;
+```
+
+### TLS
+
+```rust
+// Server with TLS
+Endpoint::builder()
+    .with_tls(cert, key)
+    .serve("0.0.0.0:9999").await?;
+
+// Client
+Client::connect("zap+tls://example.com:9999").await?;
+```
+
+### QUIC
+
+```rust
+// Server
+Endpoint::serve_quic("0.0.0.0:9999", cert, key).await?;
+
+// Client
+Client::connect("zap+quic://example.com:9999").await?;
+```
+
+### Shared Memory
+
+For in-process communication with minimal overhead:
+
+```rust
+// Create shared segment
+let segment = SharedSegment::create("my-tools")?;
+
+// Server (same process)
+Endpoint::serve_mem(&segment).await?;
+
+// Client (same process)
+Client::connect("zap+mem://my-tools").await?;
+```
+
+### Stdio (Subprocess)
+
+For launching tools as subprocesses:
+
+```rust
+// Parent process
+let child = Command::new("zap-tool")
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .spawn()?;
+
+let client = Client::connect_stdio(child.stdin.take()?, child.stdout.take()?).await?;
+
+// Or via URI
+let client = Client::connect("zap+stdio://./zap-tool").await?;
+```
+
+## Performance Comparison
+
+| Transport | Latency (p50) | Throughput | Use Case |
+|-----------|---------------|------------|----------|
+| Shared Memory | 0.8μs | 1.2M/s | Same process |
+| Unix Socket | 12μs | 83k/s | Same machine |
+| TCP (local) | 45μs | 22k/s | Same machine (network stack) |
+| TCP (remote) | 1-100ms | varies | Cross-machine |
+| QUIC | 1-50ms | varies | High-latency links |
+
+## Connection Pooling
+
+ZAP clients automatically pool connections:
+
+```rust
+let client = Client::builder()
+    .max_connections(10)
+    .idle_timeout(Duration::from_secs(60))
+    .connect("zap://localhost:9999")
+    .await?;
+```
+
+## Multiplexing
+
+All transports support multiplexing multiple concurrent calls over a single connection. This is handled automatically by the Cap'n Proto RPC layer.
