@@ -1,8 +1,11 @@
 ARG GOLANG_VERSION=1.23
 ARG ALPINE_VERSION=3.21
 
-# Stage 1: Build
-FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION} AS builder
+# Stage 1: Build using Go's native cross-compilation
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+ARG TARGETARCH
+ARG TARGETOS=linux
 
 RUN apk add --no-cache git
 
@@ -10,7 +13,7 @@ COPY . /app
 WORKDIR /app
 
 RUN go mod download && \
-    CGO_ENABLED=0 go build -ldflags="-s -w" -o /zap ./cmd/zap-sidecar
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /zap ./cmd/zap-sidecar
 
 # Stage 2: Runtime
 FROM alpine:${ALPINE_VERSION}

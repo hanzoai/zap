@@ -26,6 +26,7 @@ func main() {
 	port := flag.Int("port", 9651, "ZAP listen port")
 	serviceType := flag.String("service-type", "_hanzo._tcp", "mDNS service type")
 	backend := flag.String("backend", "", "backend address (e.g. localhost:5432)")
+	password := flag.String("password", "", "backend password (KV/Datastore)")
 	flag.Parse()
 
 	if *mode == "" {
@@ -33,6 +34,9 @@ func main() {
 	}
 	if *backend == "" {
 		*backend = os.Getenv("ZAP_BACKEND")
+	}
+	if *password == "" {
+		*password = os.Getenv("ZAP_PASSWORD")
 	}
 	if *nodeID == "" {
 		*nodeID = *mode
@@ -65,6 +69,7 @@ func main() {
 			Port:        *port,
 			ServiceType: *serviceType,
 			Addr:        *backend,
+			Password:    *password,
 		})
 	case "datastore":
 		svc, err = datastore.New(ctx, logger, datastore.Config{
@@ -72,6 +77,8 @@ func main() {
 			Port:        *port,
 			ServiceType: *serviceType,
 			Addr:        *backend,
+			User:        os.Getenv("ZAP_USER"),
+			Password:    *password,
 		})
 	default:
 		logger.Error("unknown mode, use: sql, kv, or datastore", "mode", *mode)
