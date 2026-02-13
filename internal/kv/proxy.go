@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/luxfi/zap"
 	"github.com/redis/go-redis/v9"
@@ -48,9 +49,16 @@ func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Proxy, error) {
 		Password: cfg.Password,
 		DB:       cfg.DB,
 	})
-	if err := client.Ping(ctx).Err(); err != nil {
-		client.Close()
-		return nil, fmt.Errorf("kv: ping failed: %w", err)
+	// Retry ping — Redis may still be loading data (AOF/RDB replay)
+	for i := 0; i < 30; i++ {
+		if err := client.Ping(ctx).Err(); err == nil {
+			break
+		} else if i == 29 {
+			client.Close()
+			return nil, fmt.Errorf("kv: ping failed after retries: %w", err)
+		}
+		logger.Info("kv: waiting for backend", "attempt", i+1, "addr", cfg.Addr)
+		time.Sleep(2 * time.Second)
 	}
 
 	p := &Proxy{client: client, logger: logger}

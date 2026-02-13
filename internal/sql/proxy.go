@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/luxfi/zap"
@@ -40,13 +41,23 @@ type Proxy struct {
 }
 
 func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Proxy, error) {
-	pool, err := pgxpool.New(ctx, cfg.DSN)
-	if err != nil {
-		return nil, fmt.Errorf("sql: connect failed: %w", err)
-	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("sql: ping failed: %w", err)
+	var pool *pgxpool.Pool
+	var err error
+	for i := 0; i < 30; i++ {
+		pool, err = pgxpool.New(ctx, cfg.DSN)
+		if err == nil {
+			if pingErr := pool.Ping(ctx); pingErr == nil {
+				break
+			} else {
+				pool.Close()
+				err = pingErr
+			}
+		}
+		if i == 29 {
+			return nil, fmt.Errorf("sql: connect failed after retries: %w", err)
+		}
+		logger.Info("sql: waiting for backend", "attempt", i+1)
+		time.Sleep(2 * time.Second)
 	}
 
 	p := &Proxy{pool: pool, logger: logger}
