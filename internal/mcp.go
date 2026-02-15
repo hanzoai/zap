@@ -186,3 +186,81 @@ var DatastoreResources = []ResourceDef{
 		MimeType:    "application/json",
 	},
 }
+
+// DocumentDBTools defines the MCP tools exposed by the DocumentDB proxy.
+var DocumentDBTools = []ToolDef{
+	{
+		Name:        "documentdb_find",
+		Description: "Find documents in a collection matching a filter",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"collection": map[string]string{"type": "string", "description": "Collection name"},
+				"filter":     map[string]string{"type": "object", "description": "MongoDB query filter"},
+				"limit":      map[string]string{"type": "integer", "description": "Max documents to return"},
+				"database":   map[string]string{"type": "string", "description": "Database name (default: hanzo)"},
+			},
+			"required": []string{"collection"},
+		},
+	},
+	{
+		Name:        "documentdb_insert",
+		Description: "Insert documents into a collection",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"collection": map[string]string{"type": "string", "description": "Collection name"},
+				"documents": map[string]interface{}{
+					"type":        "array",
+					"description": "Array of documents to insert",
+				},
+				"database": map[string]string{"type": "string", "description": "Database name"},
+			},
+			"required": []string{"collection", "documents"},
+		},
+	},
+	{
+		Name:        "documentdb_update",
+		Description: "Update documents matching a filter",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"collection": map[string]string{"type": "string", "description": "Collection name"},
+				"filter":     map[string]string{"type": "object", "description": "Match filter"},
+				"update":     map[string]string{"type": "object", "description": "Update operations"},
+				"database":   map[string]string{"type": "string", "description": "Database name"},
+			},
+			"required": []string{"collection", "filter", "update"},
+		},
+	},
+	{
+		Name:        "documentdb_delete",
+		Description: "Delete documents matching a filter",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"collection": map[string]string{"type": "string", "description": "Collection name"},
+				"filter":     map[string]string{"type": "object", "description": "Match filter"},
+				"database":   map[string]string{"type": "string", "description": "Database name"},
+			},
+			"required": []string{"collection", "filter"},
+		},
+	},
+	{
+		Name:        "documentdb_health",
+		Description: "Check DocumentDB/FerretDB connection health",
+		Schema: map[string]interface{}{
+			"type": "object", "properties": map[string]interface{}{},
+		},
+	},
+}
+
+// DocumentDBResources defines MCP resources for the DocumentDB proxy.
+var DocumentDBResources = []ResourceDef{
+	{
+		URI:         "hanzo://documentdb/collections",
+		Name:        "DocumentDB Collections",
+		Description: "List of collections and their indexes",
+		MimeType:    "application/json",
+	},
+}

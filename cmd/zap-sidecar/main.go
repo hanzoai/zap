@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/hanzoai/zap-sidecar/internal/datastore"
+	"github.com/hanzoai/zap-sidecar/internal/documentdb"
 	"github.com/hanzoai/zap-sidecar/internal/kv"
 	"github.com/hanzoai/zap-sidecar/internal/sql"
 )
@@ -80,8 +81,16 @@ func main() {
 			User:        os.Getenv("ZAP_USER"),
 			Password:    *password,
 		})
+	case "documentdb":
+		svc, err = documentdb.New(ctx, logger, documentdb.Config{
+			NodeID:      *nodeID,
+			Port:        *port,
+			ServiceType: *serviceType,
+			Addr:        *backend,
+			Database:    os.Getenv("ZAP_DATABASE"),
+		})
 	default:
-		logger.Error("unknown mode, use: sql, kv, or datastore", "mode", *mode)
+		logger.Error("unknown mode, use: sql, kv, datastore, or documentdb", "mode", *mode)
 		os.Exit(1)
 	}
 
