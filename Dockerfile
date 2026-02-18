@@ -1,8 +1,7 @@
 ARG GOLANG_VERSION=1.26
-ARG ALPINE_VERSION=3.21
 
 # Stage 1: Build using Go's native cross-compilation
-FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION}-alpine AS builder
 
 ARG TARGETARCH
 ARG TARGETOS=linux
@@ -16,7 +15,7 @@ RUN go mod download && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /zap ./cmd/zap-sidecar
 
 # Stage 2: Runtime
-FROM alpine:${ALPINE_VERSION}
+FROM alpine:latest
 
 LABEL maintainer="dev@hanzo.ai"
 LABEL org.opencontainers.image.source="https://github.com/hanzoai/zap-sidecar"
