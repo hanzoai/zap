@@ -117,29 +117,40 @@ var KVTools = []ToolDef{
 	},
 }
 
-// DatastoreTools defines the MCP tools exposed by the Datastore proxy.
+// DatastoreTools defines the MCP tools exposed by the Datastore proxy (native TCP).
 var DatastoreTools = []ToolDef{
 	{
 		Name:        "datastore_query",
-		Description: "Execute a ClickHouse SQL query and return results as JSON rows",
+		Description: "Execute a ClickHouse SQL query via native protocol and return results as JSON rows",
 		Schema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"sql":      map[string]string{"type": "string", "description": "ClickHouse SQL query"},
-				"database": map[string]string{"type": "string", "description": "Database name (default: console)"},
-				"format":   map[string]string{"type": "string", "description": "Output format (default: JSONEachRow)"},
+				"sql": map[string]string{"type": "string", "description": "ClickHouse SQL query"},
+			},
+			"required": []string{"sql"},
+		},
+	},
+	{
+		Name:        "datastore_exec",
+		Description: "Execute a DDL or non-SELECT ClickHouse statement (CREATE, ALTER, DROP, etc.)",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"sql":  map[string]string{"type": "string", "description": "SQL statement"},
+				"args": map[string]string{"type": "array", "description": "Statement parameters"},
 			},
 			"required": []string{"sql"},
 		},
 	},
 	{
 		Name:        "datastore_insert",
-		Description: "Bulk insert rows into a ClickHouse table (optimized for AI telemetry)",
+		Description: "Bulk insert rows into a ClickHouse table via native batch protocol",
 		Schema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"table":    map[string]string{"type": "string", "description": "Target table name"},
 				"database": map[string]string{"type": "string", "description": "Database name"},
+				"columns":  map[string]interface{}{"type": "array", "items": map[string]string{"type": "string"}, "description": "Column names (inferred from rows if omitted)"},
 				"rows": map[string]interface{}{
 					"type":        "array",
 					"description": "Array of row objects to insert",
@@ -149,8 +160,18 @@ var DatastoreTools = []ToolDef{
 		},
 	},
 	{
+		Name:        "datastore_tables",
+		Description: "List tables and their metadata in a ClickHouse database",
+		Schema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"database": map[string]string{"type": "string", "description": "Database name (default: configured database)"},
+			},
+		},
+	},
+	{
 		Name:        "datastore_health",
-		Description: "Check ClickHouse connection health",
+		Description: "Check ClickHouse native TCP connection health and server version",
 		Schema: map[string]interface{}{
 			"type": "object", "properties": map[string]interface{}{},
 		},

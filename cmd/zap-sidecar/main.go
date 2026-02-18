@@ -80,6 +80,7 @@ func main() {
 			Addr:        *backend,
 			User:        os.Getenv("ZAP_USER"),
 			Password:    *password,
+			Database:    os.Getenv("ZAP_DATABASE"),
 		})
 	case "documentdb":
 		svc, err = documentdb.New(ctx, logger, documentdb.Config{

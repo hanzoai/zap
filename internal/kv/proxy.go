@@ -15,7 +15,8 @@ import (
 	"time"
 
 	"github.com/luxfi/zap"
-	"github.com/redis/go-redis/v9"
+
+	kv "github.com/hanzoai/kv-go/v9"
 )
 
 const MsgTypeKV uint16 = 301
@@ -39,12 +40,12 @@ type Config struct {
 
 type Proxy struct {
 	node   *zap.Node
-	client *redis.Client
+	client *kv.Client
 	logger *slog.Logger
 }
 
 func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Proxy, error) {
-	client := redis.NewClient(&redis.Options{
+	client := kv.NewClient(&kv.Options{
 		Addr:     cfg.Addr,
 		Password: cfg.Password,
 		DB:       cfg.DB,
@@ -153,7 +154,7 @@ func (p *Proxy) get(ctx context.Context, body []byte) *zap.Message {
 	}
 
 	val, err := p.client.Get(ctx, req.Key).Result()
-	if err == redis.Nil {
+	if err == kv.Nil {
 		return respond(http.StatusOK, map[string]interface{}{"value": nil})
 	}
 	if err != nil {

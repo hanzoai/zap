@@ -1,19 +1,20 @@
-// Package datastore implements a ZAP-to-ClickHouse sidecar.
+// Package datastore implements a ZAP-to-ClickHouse sidecar using the native
+// ClickHouse TCP protocol (port 9000). Zero HTTP — pure native driver.
 //
-// Accepts ZAP connections and translates to ClickHouse HTTP API.
-// Optimized for bulk insert of AI telemetry and traces.
-// Exposes MCP-compatible tools: datastore_query, datastore_insert.
+// Accepts ZAP connections and translates to ClickHouse native protocol.
+// Optimized for bulk insert of AI telemetry, ad-tech analytics, and traces.
+// Exposes MCP-compatible tools: datastore_query, datastore_insert, datastore_exec.
 package datastore
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/luxfi/zap"
 )
 
@@ -22,6 +23,7 @@ const MsgTypeDatastore uint16 = 302
 const (
 	fieldPath = 4
 	fieldBody = 12
+
 	respStatus  = 0
 	respBody    = 4
 	respHeaders = 8
@@ -31,7 +33,7 @@ type Config struct {
 	NodeID      string
 	Port        int
 	ServiceType string
-	Addr        string
+	Addr        string // host:9000 (native TCP)
 	User        string
 	Password    string
 	Database    string
@@ -39,10 +41,7 @@ type Config struct {
 
 type Proxy struct {
 	node     *zap.Node
-	http     *http.Client
-	addr     string
-	user     string
-	password string
+	conn     clickhouse.Conn
 	database string
 	logger   *slog.Logger
 }
@@ -55,21 +54,48 @@ func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Proxy, error) {
 		cfg.User = "default"
 	}
 
+	// Connect via native TCP protocol (port 9000)
+	opts := &clickhouse.Options{
+		Addr: []string{cfg.Addr},
+		Auth: clickhouse.Auth{
+			Database: cfg.Database,
+			Username: cfg.User,
+			Password: cfg.Password,
+		},
+		DialTimeout:      10 * time.Second,
+		MaxOpenConns:     10,
+		MaxIdleConns:     5,
+		ConnMaxLifetime:  time.Hour,
+		ConnOpenStrategy: clickhouse.ConnOpenInOrder,
+	}
+
+	var conn clickhouse.Conn
+	var err error
+
+	// Retry loop — wait for ClickHouse to be ready (Docker startup order)
+	for i := 0; i < 30; i++ {
+		conn, err = clickhouse.Open(opts)
+		if err == nil {
+			pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err = conn.Ping(pingCtx)
+			cancel()
+			if err == nil {
+				break
+			}
+			conn.Close()
+		}
+		logger.Warn("datastore not ready, retrying", "attempt", i+1, "error", err)
+		time.Sleep(2 * time.Second)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("datastore: connect failed after 30 retries: %w", err)
+	}
+
 	p := &Proxy{
-		http:     &http.Client{},
-		addr:     cfg.Addr,
-		user:     cfg.User,
-		password: cfg.Password,
+		conn:     conn,
 		database: cfg.Database,
 		logger:   logger,
 	}
-
-	// Verify ClickHouse
-	resp, err := p.http.Get(fmt.Sprintf("http://%s/ping", cfg.Addr))
-	if err != nil {
-		return nil, fmt.Errorf("datastore: ping failed: %w", err)
-	}
-	resp.Body.Close()
 
 	node := zap.NewNode(zap.NodeConfig{
 		NodeID:      cfg.NodeID,
@@ -83,17 +109,21 @@ func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Proxy, error) {
 	})
 
 	if err := node.Start(); err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("datastore: node start failed: %w", err)
 	}
 
 	p.node = node
-	logger.Info("datastore sidecar ready", "addr", cfg.Addr, "db", cfg.Database)
+	logger.Info("datastore sidecar ready (native TCP)", "addr", cfg.Addr, "db", cfg.Database)
 	return p, nil
 }
 
 func (p *Proxy) Stop() {
 	if p.node != nil {
 		p.node.Stop()
+	}
+	if p.conn != nil {
+		p.conn.Close()
 	}
 }
 
@@ -107,8 +137,12 @@ func (p *Proxy) handle(msg *zap.Message) *zap.Message {
 		return p.health()
 	case "/query":
 		return p.query(body)
+	case "/exec":
+		return p.exec(body)
 	case "/insert":
 		return p.insert(body)
+	case "/tables":
+		return p.tables(body)
 	default:
 		if len(body) > 0 {
 			return p.query(body)
@@ -117,10 +151,13 @@ func (p *Proxy) handle(msg *zap.Message) *zap.Message {
 	}
 }
 
+// ================================================================
+// /query — SELECT via native protocol, return rows as JSON
+// ================================================================
+
 type dsQuery struct {
 	SQL      string `json:"sql"`
 	Database string `json:"database,omitempty"`
-	Format   string `json:"format,omitempty"`
 }
 
 func (p *Proxy) query(body []byte) *zap.Message {
@@ -128,38 +165,81 @@ func (p *Proxy) query(body []byte) *zap.Message {
 	if err := json.Unmarshal(body, &req); err != nil {
 		req.SQL = string(body)
 	}
-	if req.Database == "" {
-		req.Database = p.database
-	}
-	if req.Format == "" {
-		req.Format = "JSONEachRow"
-	}
 
-	sql := req.SQL + " FORMAT " + req.Format
-	url := fmt.Sprintf("http://%s/?database=%s", p.addr, req.Database)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewReader([]byte(sql)))
-	httpReq.Header.Set("X-ClickHouse-User", p.user)
-	if p.password != "" {
-		httpReq.Header.Set("X-ClickHouse-Key", p.password)
-	}
-
-	resp, err := p.http.Do(httpReq)
+	rows, err := p.conn.Query(ctx, req.SQL)
 	if err != nil {
 		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
 	}
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	defer rows.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return respond(resp.StatusCode, map[string]string{"error": string(respBody)})
+	columns := rows.ColumnTypes()
+	colNames := make([]string, len(columns))
+	for i, col := range columns {
+		colNames[i] = col.Name()
 	}
-	return respondRaw(http.StatusOK, respBody)
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(columns))
+		valPtrs := make([]interface{}, len(columns))
+		for i := range vals {
+			valPtrs[i] = &vals[i]
+		}
+		if err := rows.Scan(valPtrs...); err != nil {
+			return respond(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+		row := make(map[string]interface{}, len(columns))
+		for i, name := range colNames {
+			row[name] = vals[i]
+		}
+		results = append(results, row)
+	}
+	if err := rows.Err(); err != nil {
+		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
+
+	return respond(http.StatusOK, map[string]interface{}{
+		"rows":  results,
+		"count": len(results),
+	})
 }
+
+// ================================================================
+// /exec — DDL / non-SELECT statements
+// ================================================================
+
+type dsExec struct {
+	SQL  string        `json:"sql"`
+	Args []interface{} `json:"args,omitempty"`
+}
+
+func (p *Proxy) exec(body []byte) *zap.Message {
+	var req dsExec
+	if err := json.Unmarshal(body, &req); err != nil {
+		return respond(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err := p.conn.Exec(ctx, req.SQL, req.Args...)
+	if err != nil {
+		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
+	return respond(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ================================================================
+// /insert — bulk insert via native batch protocol
+// ================================================================
 
 type insertReq struct {
 	Table    string                   `json:"table"`
 	Database string                   `json:"database,omitempty"`
+	Columns  []string                 `json:"columns,omitempty"`
 	Rows     []map[string]interface{} `json:"rows"`
 }
 
@@ -168,50 +248,139 @@ func (p *Proxy) insert(body []byte) *zap.Message {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return respond(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	if req.Database == "" {
-		req.Database = p.database
+	if len(req.Rows) == 0 {
+		return respond(http.StatusBadRequest, map[string]string{"error": "no rows"})
 	}
 
-	var buf bytes.Buffer
-	for _, row := range req.Rows {
-		line, _ := json.Marshal(row)
-		buf.Write(line)
-		buf.WriteByte('\n')
+	// Build column list from first row if not provided
+	cols := req.Columns
+	if len(cols) == 0 && len(req.Rows) > 0 {
+		for k := range req.Rows[0] {
+			cols = append(cols, k)
+		}
 	}
 
-	sql := fmt.Sprintf("INSERT INTO %s FORMAT JSONEachRow", req.Table)
-	url := fmt.Sprintf("http://%s/?database=%s&query=%s", p.addr, req.Database, sql)
-
-	httpReq, _ := http.NewRequest("POST", url, &buf)
-	httpReq.Header.Set("X-ClickHouse-User", p.user)
-	if p.password != "" {
-		httpReq.Header.Set("X-ClickHouse-Key", p.password)
+	// Build INSERT statement
+	table := req.Table
+	if req.Database != "" && req.Database != p.database {
+		table = req.Database + "." + req.Table
 	}
 
-	resp, err := p.http.Do(httpReq)
+	colList := ""
+	for i, c := range cols {
+		if i > 0 {
+			colList += ", "
+		}
+		colList += c
+	}
+	sql := fmt.Sprintf("INSERT INTO %s (%s)", table, colList)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	batch, err := p.conn.PrepareBatch(ctx, sql)
 	if err != nil {
 		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
 	}
-	defer resp.Body.Close()
-	rb, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode != http.StatusOK {
-		return respond(resp.StatusCode, map[string]string{"error": string(rb)})
+	for _, row := range req.Rows {
+		vals := make([]interface{}, len(cols))
+		for i, col := range cols {
+			vals[i] = row[col]
+		}
+		if err := batch.Append(vals...); err != nil {
+			return respond(http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("row append: %s", err),
+			})
+		}
 	}
+
+	if err := batch.Send(); err != nil {
+		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
+
 	return respond(http.StatusOK, map[string]interface{}{
 		"status":   "ok",
 		"inserted": len(req.Rows),
 	})
 }
 
-func (p *Proxy) health() *zap.Message {
-	resp, err := p.http.Get(fmt.Sprintf("http://%s/ping", p.addr))
+// ================================================================
+// /tables — introspect schema
+// ================================================================
+
+type tablesReq struct {
+	Database string `json:"database,omitempty"`
+}
+
+func (p *Proxy) tables(body []byte) *zap.Message {
+	var req tablesReq
+	json.Unmarshal(body, &req)
+	db := req.Database
+	if db == "" {
+		db = p.database
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rows, err := p.conn.Query(ctx,
+		"SELECT name, engine, total_rows, total_bytes FROM system.tables WHERE database = ?", db)
 	if err != nil {
+		return respond(http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
+	defer rows.Close()
+
+	type tableInfo struct {
+		Name       string  `json:"name"`
+		Engine     string  `json:"engine"`
+		TotalRows  *uint64 `json:"total_rows"`
+		TotalBytes *uint64 `json:"total_bytes"`
+	}
+	var tables []tableInfo
+	for rows.Next() {
+		var t tableInfo
+		if err := rows.Scan(&t.Name, &t.Engine, &t.TotalRows, &t.TotalBytes); err != nil {
+			continue
+		}
+		tables = append(tables, t)
+	}
+
+	return respond(http.StatusOK, map[string]interface{}{
+		"database": db,
+		"tables":   tables,
+	})
+}
+
+// ================================================================
+// /health — native ping
+// ================================================================
+
+func (p *Proxy) health() *zap.Message {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := p.conn.Ping(ctx); err != nil {
 		return respond(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 	}
-	resp.Body.Close()
-	return respond(http.StatusOK, map[string]string{"status": "ok", "service": "hanzo-datastore"})
+
+	info, _ := p.conn.ServerVersion()
+	ver := ""
+	if info != nil {
+		ver = fmt.Sprintf("%d.%d.%d", info.Version.Major, info.Version.Minor, info.Version.Patch)
+	}
+
+	return respond(http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"service": "hanzo-datastore",
+		"native":  true,
+		"version": ver,
+	})
 }
+
+// ================================================================
+// ZAP response builders
+// ================================================================
 
 func respond(status int, data interface{}) *zap.Message {
 	b := zap.NewBuilder(4096)
@@ -220,17 +389,6 @@ func respond(status int, data interface{}) *zap.Message {
 	body, _ := json.Marshal(data)
 	ob.SetBytes(respBody, body)
 	ob.SetBytes(respHeaders, []byte(`{"Content-Type":["application/json"]}`))
-	ob.FinishAsRoot()
-	msg, _ := zap.Parse(b.Finish())
-	return msg
-}
-
-func respondRaw(status int, raw []byte) *zap.Message {
-	b := zap.NewBuilder(len(raw) + 256)
-	ob := b.StartObject(12)
-	ob.SetUint32(respStatus, uint32(status))
-	ob.SetBytes(respBody, raw)
-	ob.SetBytes(respHeaders, []byte(`{"Content-Type":["application/x-ndjson"]}`))
 	ob.FinishAsRoot()
 	msg, _ := zap.Parse(b.Finish())
 	return msg
