@@ -1,6 +1,6 @@
 module github.com/hanzoai/zap-sidecar
 
-go 1.24.1
+go 1.26.0
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
@@ -47,5 +47,3 @@ require (
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect
 )
-
-replace github.com/hanzoai/kv-go/v9 => ../kv-go
