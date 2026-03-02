@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG GOLANG_VERSION=1.26
 
 # Stage 1: Build using Go's native cross-compilation
@@ -11,7 +12,9 @@ RUN apk add --no-cache git
 COPY . /app
 WORKDIR /app
 
-RUN go mod download && \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /zap ./cmd/zap-sidecar
 
 # Stage 2: Runtime
