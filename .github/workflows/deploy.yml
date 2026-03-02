@@ -16,7 +16,5 @@ jobs:
     uses: hanzoai/.github/.github/workflows/docker-build.yml@main
     with:
       image: ghcr.io/hanzoai/zap
-      deploy: true
-      deploy-deployment: zap
-      deploy-namespace: hanzo
+      deploy: false
     secrets: inherit
