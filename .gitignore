@@ -3,3 +3,4 @@ AGENTS.md
 GEMINI.md
 QWEN.md
 rust/target/
+.DS_Store
