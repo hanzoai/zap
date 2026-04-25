@@ -1,19 +1,10 @@
-.PHONY: build test docker clean
+.PHONY: tidy
 
-IMAGE := ghcr.io/hanzoai/zap
-TAG := latest
+# This repo no longer ships a binary. The former `cmd/zap-sidecar` has been
+# removed; ZAP is implemented natively inside each backend service (sql, kv,
+# docdb, datastore, etc.) and exposed on TCP/9999 by the service itself.
+#
+# See README.md for the deprecation notice and migration history.
 
-build:
-	go build -o bin/zap ./cmd/zap-sidecar
-
-test:
-	go test -v -race ./...
-
-docker:
-	docker build -t $(IMAGE):$(TAG) .
-
-push: docker
-	docker push $(IMAGE):$(TAG)
-
-clean:
-	rm -rf bin/
+tidy:
+	go mod tidy
