@@ -2,28 +2,39 @@
 
 [package]
 name = "hanzo-zap"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2021"
-description = "ZAP — Zero-copy Agent Protocol. Binary RPC server with object capabilities."
+description = "ZAP — Zero-copy Application Protocol. Binary RPC with capnp segments and ZAP framing."
 license = "MIT"
 repository = "https://github.com/hanzoai/zap"
-keywords = ["zap", "rpc", "binary-protocol", "websocket", "ai"]
-categories = ["network-programming", "web-programming"]
+keywords = ["zap", "rpc", "binary-protocol", "capnproto", "zero-copy"]
+categories = ["network-programming", "encoding"]
+
+# v1.x was a JSON-payload-in-binary-frame WebSocket experiment. v2.x
+# is the real ZAP: a Cap'n-Proto-style zero-copy binary protocol that
+# matches the on-wire format of github.com/luxfi/zap (Go) and
+# @zap-proto/zap (TS). Major version bump — wire-incompatible with v1.
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = "0.24"
+# Cap'n Proto runtime — zero-copy reader/builder for the data segment.
+# The ZAP wire format wraps capnp segments inside our 16-byte header.
+capnp        = { version = "0.20", default-features = false, features = ["alloc"] }
+capnp-futures = "0.20"
+
+tokio        = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "sync", "signal", "time"] }
 futures-util = "0.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4"
-anyhow = "1.0"
-chrono = "0.4"
-async-trait = "0.1"
+async-trait  = "0.1"
+log          = "0.4"
+anyhow       = "1.0"
+thiserror    = "2"
+
 env_logger = "0.11"
 
 [dev-dependencies]
-tempfile = "3"
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[build-dependencies]
+capnpc = "0.20"
 
 [[bin]]
 name = "hanzo-zap"

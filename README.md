@@ -1,50 +1,58 @@
-# Hanzo ZAP — deprecated repository
+# Hanzo ZAP
 
-This repository previously hosted `zap-sidecar`, a standalone Go binary
-that ran as a sidecar container next to each backend service (PostgreSQL,
-Valkey, ClickHouse, FerretDB) and bridged the ZAP protocol to the
-co-located backend.
+ZAP — **Zero-copy Application Protocol**. Cap'n-Proto-style binary RPC
+used for service-to-service communication across the Hanzo / Lux /
+Liquidity stacks. Wire-compatible Go, Rust, and TypeScript
+implementations.
 
-**That abstraction has been removed.** ZAP is now implemented natively
-inside each backend service and exposed on TCP `9999` by the service
-itself. There is no separate sidecar container, no `ghcr.io/hanzoai/zap`
-image, and no `ZAPSidecar` CRD field.
+## Wire format
 
-## What was deleted
+```
+┌─ Header (16 bytes) ────────────────────────────────────────────┐
+│  Magic       4   "ZAP\0"                                       │
+│  Version     2   u16 LE                                        │
+│  Flags       2   u16 LE  (compressed, encrypted, signed, …)    │
+│  RootOffset  4   u32 LE  offset to root within data segment    │
+│  Size        4   u32 LE  total message size including header   │
+└────────────────────────────────────────────────────────────────┘
+┌─ Data segment (variable, 8-byte aligned) ──────────────────────┐
+│  Cap'n-Proto-style structs / lists / text / bytes              │
+└────────────────────────────────────────────────────────────────┘
+```
 
-- `cmd/zap-sidecar/main.go` — the sidecar binary entrypoint
-- `internal/sql/`, `internal/kv/`, `internal/datastore/`,
-  `internal/documentdb/` — sidecar-only protocol bridges
-- `internal/mcp.go` — MCP shim for the sidecar
-- `Dockerfile` — produced `ghcr.io/hanzoai/zap:*`
+All multi-byte integers are little-endian. The data segment uses the
+canonical capnp segment layout — readers walk it with zero allocation
+via `capnp::message::Reader` (Rust), `capnp.Parse` (Go), or `@zap-proto`
+(TypeScript).
 
-## What remains
+## Implementations
 
-- `LICENSE`, `LLM.md`, this `README.md`
-- `Makefile`, `go.mod`, `go.sum` — kept so the repo still builds clean
-- `rust/` — the Rust ZAP library (still active, embedded into Rust
-  services such as `hanzo/base`)
-- `out/`, `public/` — historical assets
+| Language | Path | Status |
+|----------|------|--------|
+| Rust     | `rust/`                        | this crate (v2.0) |
+| Go       | `github.com/luxfi/zap`         | reference |
+| TypeScript | `@zap-proto/zap`             | reference |
 
-## Where ZAP lives now
+The three impls MUST stay wire-compatible. Schema lives at
+`rust/schema/zap.capnp` (canonical) — bump the file id (`@0x…;`) for
+wire-incompatible changes.
 
-Backend services bake ZAP into their primary container:
+## v1 → v2
 
-| Service | Repo | ZAP location |
-|---------|------|--------------|
-| `sql` | `hanzo/sql` | embedded in `ghcr.io/hanzoai/sql:*` |
-| `kv` | `hanzo/kv` | embedded in `ghcr.io/hanzoai/kv:*` |
-| `docdb` | `hanzo/docdb` | embedded in `ghcr.io/hanzoai/docdb:*` |
-| `datastore` | `hanzo/datastore` | embedded in `ghcr.io/hanzoai/datastore:*` |
-| `base` | `hanzo/base` | embedded in `ghcr.io/hanzoai/base:*` (Rust) |
+Versions 1.x of the Rust crate were a JSON-payload-in-binary-frame
+WebSocket experiment that called itself ZAP but was incompatible with
+the Go reference. **v2.0 is wire-incompatible with v1.x.** Upgrade
+together with the Go and TS deps; the protocol version byte (`1` in
+both v1 and v2 headers) is intentionally not bumped because v1 was
+never deployed in production.
 
-The ZAP protocol itself is unchanged. Existing ZAP clients
-(zapd / hanzoai/gateway) connect to the same TCP `9999` port — the
-container layout is what changed.
+## JWKS-via-ZAP
 
-## Migration timeline
+ZAP carries its own JWKS push protocol (`KeysSubscribe` →
+`KeysSnapshot` → `KeysRotate` / `KeysRevoke`). Consumers subscribe
+once, cache locally, and skip the `/.well-known/jwks` HTTP polling
+that otherwise dominates IAM load. See `schema/zap.capnp`.
 
-- **Apr 2026**: sidecar binary and protocol bridges deleted from this
-  repo; CRD fields and CR `zap:` blocks stripped from operators and
-  k8s manifests; native ZAP exposure verified on `sql`, `kv`, `docdb`,
-  `datastore` StatefulSets.
+## License
+
+MIT.
