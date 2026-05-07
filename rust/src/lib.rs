@@ -27,11 +27,19 @@
 //! implementations.
 
 pub mod msg;
+pub mod schema;
 pub mod server;
 pub mod wire;
 
 pub use wire::{Flags, Header, WireError, MAGIC, HEADER_SIZE, VERSION, MAX_SIZE};
 pub use wire::{read_frame, write_frame};
+
+/// The generated capnp bindings — `Init`, `Push`, `KeysSnapshot`, etc.
+/// Re-exported so callers don't need a transitive `capnp` dep just
+/// to read schema types.
+pub mod proto {
+    pub use super::schema::*;
+}
 
 /// Re-export of the capnp runtime so consumers don't need a direct dep.
 pub use capnp as capnp_runtime;

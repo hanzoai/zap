@@ -246,4 +246,41 @@ mod tests {
         assert_eq!(hdr.size as usize, HEADER_SIZE + body.len());
         assert_eq!(got, body);
     }
+
+    /// End-to-end: build a real capnp message via the generated bindings,
+    /// wrap it in a ZAP frame, decode, walk the message zero-copy.
+    /// Proves the schema-generated types and the wire layer compose.
+    #[test]
+    fn capnp_roundtrip() {
+        use crate::schema;
+        use capnp::message::{Builder, ReaderOptions};
+        use capnp::serialize;
+
+        // Build a KeysSubscribe message with the generated builder.
+        let mut msg = Builder::new_default();
+        {
+            let mut sub = msg.init_root::<schema::keys_subscribe::Builder>();
+            sub.set_application("liquidity");
+            sub.set_cursor(42);
+        }
+
+        // Serialise to a flat buffer (canonical capnp segment table).
+        let mut body = Vec::new();
+        serialize::write_message(&mut body, &msg).unwrap();
+
+        // Wrap in a ZAP frame.
+        let mut framed = Vec::new();
+        write_frame(&mut framed, Flags::NONE, 0, &body).unwrap();
+
+        // Round-trip through the wire layer.
+        let mut cur = std::io::Cursor::new(&framed);
+        let (_hdr, body_back) = read_frame(&mut cur).unwrap();
+
+        // Decode + walk via the generated reader.
+        let reader =
+            serialize::read_message(&mut body_back.as_slice(), ReaderOptions::new()).unwrap();
+        let sub = reader.get_root::<schema::keys_subscribe::Reader>().unwrap();
+        assert_eq!(sub.get_application().unwrap().to_str().unwrap(), "liquidity");
+        assert_eq!(sub.get_cursor(), 42);
+    }
 }

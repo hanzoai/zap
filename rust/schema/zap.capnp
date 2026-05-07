@@ -1,18 +1,18 @@
-@0xc0a8b5e0e5f0a000;  # randomly chosen file id
+@0xc0a8b5e0e5f0a000;
 
 # ZAP canonical schema — matches @zap-proto/zap (TypeScript) and the
-# Go luxfi/zap reference. Keep these struct ids stable; bump the file
-# id when making wire-incompatible changes.
+# Go luxfi/zap reference. Compiled by build.rs via capnpc-rust into
+# `OUT_DIR/zap_capnp.rs` and re-exported through `src/schema.rs`.
 
 # ── Connection lifecycle ───────────────────────────────────────────
 
-struct Init @0xa001 {
+struct Init {
   clientId  @0 :Text;
   browser   @1 :Text;
   version   @2 :Text;
 }
 
-struct InitAck @0xa002 {
+struct InitAck {
   serverId  @0 :Text;
   name      @1 :Text;
   manifest  @2 :Data;     # opaque tool-manifest blob (capnp segment)
@@ -20,18 +20,18 @@ struct InitAck @0xa002 {
 
 # ── RPC (object-capability) ────────────────────────────────────────
 
-struct Push @0xa010 {
+struct Push {
   id       @0 :Text;
   method   @1 :Text;
   params   @2 :Data;      # method-specific capnp segment
 }
 
-struct Resolve @0xa012 {
+struct Resolve {
   id       @0 :Text;
   result   @1 :Data;
 }
 
-struct Reject @0xa013 {
+struct Reject {
   id       @0 :Text;
   code     @1 :Int32;
   message  @2 :Text;
@@ -44,24 +44,24 @@ struct Reject @0xa013 {
 # KeysRotate / KeysRevoke broadcasts whenever IAM mutates a Cert row.
 # Eliminates the cache-TTL refetch storm against /.well-known/jwks.
 
-struct KeysSubscribe @0xa050 {
+struct KeysSubscribe {
   application @0 :Text;     # empty = global
   cursor      @1 :UInt64;   # last seen rotation seq, 0 = full snapshot
 }
 
-struct KeysSnapshot @0xa051 {
+struct KeysSnapshot {
   application @0 :Text;
   seq         @1 :UInt64;   # current rotation seq
   jwksJson    @2 :Data;     # canonical JWKS bytes (RFC 7517)
 }
 
-struct KeysRotate @0xa052 {
+struct KeysRotate {
   application @0 :Text;
   seq         @1 :UInt64;
   newKey      @2 :Data;     # JSONWebKey for the new signing cert
 }
 
-struct KeysRevoke @0xa053 {
+struct KeysRevoke {
   application @0 :Text;
   seq         @1 :UInt64;
   kid         @2 :Text;     # key id of the revoked entry
@@ -69,10 +69,10 @@ struct KeysRevoke @0xa053 {
 
 # ── Control ────────────────────────────────────────────────────────
 
-struct Ping  @0xa0f0 { nonce @0 :UInt64; }
-struct Pong  @0xa0f1 { nonce @0 :UInt64; }
+struct Ping  { nonce @0 :UInt64; }
+struct Pong  { nonce @0 :UInt64; }
 
-struct ZapError @0xa0ff {
+struct ZapError {
   code    @0 :Int32;
   message @1 :Text;
 }

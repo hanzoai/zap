@@ -2,7 +2,7 @@
 
 [package]
 name = "hanzo-zap"
-version = "2.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "ZAP — Zero-copy Application Protocol. Binary RPC with capnp segments and ZAP framing."
 license = "MIT"
@@ -10,10 +10,10 @@ repository = "https://github.com/hanzoai/zap"
 keywords = ["zap", "rpc", "binary-protocol", "capnproto", "zero-copy"]
 categories = ["network-programming", "encoding"]
 
-# v1.x was a JSON-payload-in-binary-frame WebSocket experiment. v2.x
-# is the real ZAP: a Cap'n-Proto-style zero-copy binary protocol that
-# matches the on-wire format of github.com/luxfi/zap (Go) and
-# @zap-proto/zap (TS). Major version bump — wire-incompatible with v1.
+# Earlier 1.0.0 of this crate was a JSON-payload-in-binary-frame
+# WebSocket prototype that never shipped. 1.0.1 is the canonical
+# Cap'n-Proto-style zero-copy binary protocol matching the on-wire
+# format of github.com/luxfi/zap (Go) and @zap-proto/zap (TS).
 
 [dependencies]
 # Cap'n Proto runtime — zero-copy reader/builder for the data segment.
