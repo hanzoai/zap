@@ -1,0 +1,21 @@
+[package]
+name = "zapc"
+version = "1.0.0"
+edition = "2021"
+description = "ZAP schema compiler — parses .zap schema files and emits Rust readers/writers."
+license = "MIT"
+
+# Used as a library from build.rs and as a CLI binary for ad-hoc
+# generation. Both surfaces share the same Parser → Codegen pipeline.
+
+[lib]
+name = "zapc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zapc"
+path = "src/main.rs"
+
+[dependencies]
+anyhow    = "1.0"
+thiserror = "2"

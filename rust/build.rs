@@ -1,16 +1,15 @@
-//! Build script — compiles the canonical Cap'n Proto schema into
-//! Rust bindings that the runtime walks zero-copy.
+//! Build script — compiles `schema/zap.zap` into Rust readers/writers
+//! via our own `zapc` compiler (no upstream Cap'n Proto dependency).
 //!
-//! Generated module lives at `OUT_DIR/zap_capnp.rs` and is included
-//! by `src/schema.rs`. Re-run this whenever `schema/zap.capnp`
-//! changes; cargo handles the dep tracking via `rerun-if-changed`.
+//! Generated module lives at `OUT_DIR/zap_schema.rs` and is included
+//! by `src/schema.rs`.
+
+use std::path::PathBuf;
 
 fn main() {
-    capnpc::CompilerCommand::new()
-        .src_prefix("schema")
-        .file("schema/zap.capnp")
-        .run()
-        .expect("compiling schema/zap.capnp failed — is `capnp` on PATH?");
-
-    println!("cargo:rerun-if-changed=schema/zap.capnp");
+    let schema = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schema/zap.zap");
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("zap_schema.rs");
+    zapc::compile_to_rust(&schema, &out).expect("zapc compile failed");
+    println!("cargo:rerun-if-changed=schema/zap.zap");
+    println!("cargo:rerun-if-changed=../zapc-rs/src");
 }

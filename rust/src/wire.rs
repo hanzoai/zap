@@ -247,40 +247,47 @@ mod tests {
         assert_eq!(got, body);
     }
 
-    /// End-to-end: build a real capnp message via the generated bindings,
-    /// wrap it in a ZAP frame, decode, walk the message zero-copy.
-    /// Proves the schema-generated types and the wire layer compose.
+    /// End-to-end through the zapc-generated bindings. Builds a
+    /// `KeysSubscribe` via the writer, wraps in a ZAP frame, reads
+    /// back zero-copy via the reader. Proves the codegen output and
+    /// the wire layer compose.
     #[test]
-    fn capnp_roundtrip() {
-        use crate::schema;
-        use capnp::message::{Builder, ReaderOptions};
-        use capnp::serialize;
+    fn proto_roundtrip() {
+        use crate::schema::keys_subscribe;
 
-        // Build a KeysSubscribe message with the generated builder.
-        let mut msg = Builder::new_default();
-        {
-            let mut sub = msg.init_root::<schema::keys_subscribe::Builder>();
-            sub.set_application("liquidity");
-            sub.set_cursor(42);
+        let body = keys_subscribe::Writer {
+            application: "liquidity".to_string(),
+            cursor: 42,
         }
+        .to_bytes();
 
-        // Serialise to a flat buffer (canonical capnp segment table).
-        let mut body = Vec::new();
-        serialize::write_message(&mut body, &msg).unwrap();
-
-        // Wrap in a ZAP frame.
         let mut framed = Vec::new();
         write_frame(&mut framed, Flags::NONE, 0, &body).unwrap();
 
-        // Round-trip through the wire layer.
         let mut cur = std::io::Cursor::new(&framed);
         let (_hdr, body_back) = read_frame(&mut cur).unwrap();
 
-        // Decode + walk via the generated reader.
-        let reader =
-            serialize::read_message(&mut body_back.as_slice(), ReaderOptions::new()).unwrap();
-        let sub = reader.get_root::<schema::keys_subscribe::Reader>().unwrap();
-        assert_eq!(sub.get_application().unwrap().to_str().unwrap(), "liquidity");
-        assert_eq!(sub.get_cursor(), 42);
+        let r = keys_subscribe::Reader::from_slice(&body_back).unwrap();
+        assert_eq!(r.application(), "liquidity");
+        assert_eq!(r.cursor(), 42);
+    }
+
+    /// Variable-length payload (Text + Data) — exercises the relative
+    /// offset encoding that lives at the field slot.
+    #[test]
+    fn proto_keys_snapshot_with_payload() {
+        use crate::schema::keys_snapshot;
+
+        let body = keys_snapshot::Writer {
+            application: "liquidity".to_string(),
+            seq: 7,
+            jwks_json: br#"{"keys":[]}"#.to_vec(),
+        }
+        .to_bytes();
+
+        let r = keys_snapshot::Reader::from_slice(&body).unwrap();
+        assert_eq!(r.application(), "liquidity");
+        assert_eq!(r.seq(), 7);
+        assert_eq!(r.jwks_json(), br#"{"keys":[]}"# as &[u8]);
     }
 }

@@ -1,0 +1,16 @@
+# ZAP Rust workspace.
+#
+# Two crates that ship as a unit:
+#
+#   zapc-rs  — schema compiler. Parses .zap schema files and emits
+#              Rust readers/writers for each struct. Hand-rolled — no
+#              dependency on upstream capnp / capnpc.
+#
+#   rust     — runtime. Reads the canonical 16-byte ZAP header and
+#              walks the data segment via offset-driven slice indexing.
+#              Byte-for-byte compatible with github.com/luxfi/zap (Go)
+#              and @zap-proto/zap (TypeScript).
+
+[workspace]
+resolver = "2"
+members  = ["rust", "zapc-rs"]

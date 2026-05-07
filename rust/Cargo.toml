@@ -1,40 +1,39 @@
-[workspace]
-
 [package]
 name = "hanzo-zap"
 version = "1.0.1"
 edition = "2021"
-description = "ZAP — Zero-copy Application Protocol. Binary RPC with capnp segments and ZAP framing."
+description = "ZAP — Zero-copy Application Protocol. Hand-rolled little-endian binary, schema bindings via zapc."
 license = "MIT"
 repository = "https://github.com/hanzoai/zap"
-keywords = ["zap", "rpc", "binary-protocol", "capnproto", "zero-copy"]
+keywords = ["zap", "rpc", "binary-protocol", "zero-copy"]
 categories = ["network-programming", "encoding"]
 
-# Earlier 1.0.0 of this crate was a JSON-payload-in-binary-frame
-# WebSocket prototype that never shipped. 1.0.1 is the canonical
-# Cap'n-Proto-style zero-copy binary protocol matching the on-wire
-# format of github.com/luxfi/zap (Go) and @zap-proto/zap (TS).
+# 1.0.0 was a JSON-payload-in-binary-frame WebSocket prototype that
+# never shipped. 1.0.1 is the canonical Rust impl: hand-rolled
+# little-endian binary, byte-for-byte aligned with the Go reference at
+# github.com/luxfi/zap and the TS @zap-proto/zap. Schema-generated
+# readers/writers come from our own zapc compiler (path = ../zapc-rs)
+# — no upstream Cap'n Proto dependency.
 
 [dependencies]
-# Cap'n Proto runtime — zero-copy reader/builder for the data segment.
-# The ZAP wire format wraps capnp segments inside our 16-byte header.
-capnp        = { version = "0.20", default-features = false, features = ["alloc"] }
-capnp-futures = "0.20"
-
 tokio        = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "sync", "signal", "time"] }
 futures-util = "0.3"
 async-trait  = "0.1"
 log          = "0.4"
 anyhow       = "1.0"
 thiserror    = "2"
-
-env_logger = "0.11"
-
-[dev-dependencies]
-tokio = { version = "1", features = ["full", "test-util"] }
+env_logger   = "0.11"
 
 [build-dependencies]
-capnpc = "0.20"
+zapc = { path = "../zapc-rs" }
+
+[dev-dependencies]
+tokio    = { version = "1", features = ["full", "test-util"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "wire"
+harness = false
 
 [[bin]]
 name = "hanzo-zap"
