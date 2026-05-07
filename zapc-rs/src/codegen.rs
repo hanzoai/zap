@@ -70,14 +70,25 @@ fn emit_struct(out: &mut String, st: &Struct) {
     writeln!(out, "        /// Serialise to the canonical ZAP body bytes.").ok();
     writeln!(out, "        /// (Wrap with `hanzo_zap::wire::write_frame` to add the 16-byte header.)").ok();
     writeln!(out, "        pub fn to_bytes(&self) -> Vec<u8> {{").ok();
-    writeln!(out, "            let mut buf = vec![0u8; SLOT_SIZE];").ok();
-    writeln!(out, "            let mut tail: Vec<u8> = Vec::new();").ok();
+    // Single-pass: pre-size one buffer to slot + payload + 8-byte tail
+    // pad. Each Text/Data field appends its bytes to the same buffer
+    // and the slot-region offset is computed against that single Vec.
+    writeln!(out, "            let payload_len: usize = 0").ok();
+    for f in &st.fields {
+        match f.ty {
+            FieldType::Text => writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok(),
+            FieldType::Data => writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok(),
+            _ => None,
+        };
+    }
+    writeln!(out, "                ;").ok();
+    writeln!(out, "            let total = (SLOT_SIZE + payload_len + 7) & !7;").ok();
+    writeln!(out, "            let mut buf = vec![0u8; total];").ok();
+    writeln!(out, "            let mut tail_off = SLOT_SIZE;").ok();
     for f in &st.fields {
         emit_writer_set(out, f);
     }
-    writeln!(out, "            buf.extend_from_slice(&tail);").ok();
-    writeln!(out, "            // 8-byte align overall").ok();
-    writeln!(out, "            while buf.len() % 8 != 0 {{ buf.push(0); }}").ok();
+    writeln!(out, "            let _ = tail_off;").ok();
     writeln!(out, "            buf").ok();
     writeln!(out, "        }}").ok();
     writeln!(out, "    }}").ok();
@@ -172,7 +183,8 @@ fn emit_writer_set(out: &mut String, f: &crate::parser::Field) {
 }
 
 /// Emits the `Text`/`Data` writer block. Both have identical wire
-/// shape (i32 rel offset + u32 len at slot, payload appended to tail).
+/// shape (i32 rel offset + u32 len at slot, payload appended to a
+/// single combined buffer).
 fn write_var_field(out: &mut String, snake: &str, off: usize, as_bytes: bool) -> std::fmt::Result {
     writeln!(out, "            {{")?;
     if as_bytes {
@@ -181,10 +193,11 @@ fn write_var_field(out: &mut String, snake: &str, off: usize, as_bytes: bool) ->
         writeln!(out, "                let bytes: &[u8] = &self.{};", snake)?;
     }
     writeln!(out, "                if !bytes.is_empty() {{")?;
-    writeln!(out, "                    let rel = (SLOT_SIZE + tail.len() - {}) as i32;", off)?;
+    writeln!(out, "                    let rel = (tail_off - {}) as i32;", off)?;
     writeln!(out, "                    buf[{}..{}].copy_from_slice(&rel.to_le_bytes());", off, off + 4)?;
     writeln!(out, "                    buf[{}..{}].copy_from_slice(&(bytes.len() as u32).to_le_bytes());", off + 4, off + 8)?;
-    writeln!(out, "                    tail.extend_from_slice(bytes);")?;
+    writeln!(out, "                    buf[tail_off..tail_off + bytes.len()].copy_from_slice(bytes);")?;
+    writeln!(out, "                    tail_off += bytes.len();")?;
     writeln!(out, "                }}")?;
     writeln!(out, "            }}")?;
     Ok(())
