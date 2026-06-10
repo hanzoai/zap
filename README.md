@@ -1,9 +1,8 @@
 # Hanzo ZAP
 
 ZAP — **Zero-copy Application Protocol**. Cap'n-Proto-style binary RPC
-used for service-to-service communication across the Hanzo / Lux /
-Liquidity stacks. Wire-compatible Go, Rust, and TypeScript
-implementations.
+used for service-to-service communication across the Hanzo / Lux
+stacks. Wire-compatible Go, Rust, and TypeScript implementations.
 
 ## Wire format
 
