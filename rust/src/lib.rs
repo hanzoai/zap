@@ -2,7 +2,7 @@
 //!
 //! ZAP is the **Zero-copy Application Protocol** — a hand-rolled
 //! little-endian binary format used for service-to-service
-//! communication across the Hanzo / Lux / Liquidity stacks. The
+//! communication across the Hanzo / Lux stacks. The
 //! on-wire bytes match the Go reference (`github.com/luxfi/zap`) and
 //! the TypeScript reference (`@zap-proto/zap`); messages produced by
 //! any one implementation are readable by the other two.
