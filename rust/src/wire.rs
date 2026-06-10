@@ -256,7 +256,7 @@ mod tests {
         use crate::schema::keys_subscribe;
 
         let body = keys_subscribe::Writer {
-            application: "liquidity".to_string(),
+            application: "hanzo".to_string(),
             cursor: 42,
         }
         .to_bytes();
@@ -268,7 +268,7 @@ mod tests {
         let (_hdr, body_back) = read_frame(&mut cur).unwrap();
 
         let r = keys_subscribe::Reader::from_slice(&body_back).unwrap();
-        assert_eq!(r.application(), "liquidity");
+        assert_eq!(r.application(), "hanzo");
         assert_eq!(r.cursor(), 42);
     }
 
@@ -279,14 +279,14 @@ mod tests {
         use crate::schema::keys_snapshot;
 
         let body = keys_snapshot::Writer {
-            application: "liquidity".to_string(),
+            application: "hanzo".to_string(),
             seq: 7,
             jwks_json: br#"{"keys":[]}"#.to_vec(),
         }
         .to_bytes();
 
         let r = keys_snapshot::Reader::from_slice(&body).unwrap();
-        assert_eq!(r.application(), "liquidity");
+        assert_eq!(r.application(), "hanzo");
         assert_eq!(r.seq(), 7);
         assert_eq!(r.jwks_json(), br#"{"keys":[]}"# as &[u8]);
     }

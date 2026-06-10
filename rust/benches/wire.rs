@@ -12,7 +12,7 @@ fn bench_keys_subscribe_encode(c: &mut Criterion) {
     g.bench_function("zap", |b| {
         b.iter(|| {
             let bytes = keys_subscribe::Writer {
-                application: black_box("liquidity".to_string()),
+                application: black_box("hanzo".to_string()),
                 cursor: black_box(42),
             }
             .to_bytes();
@@ -23,7 +23,7 @@ fn bench_keys_subscribe_encode(c: &mut Criterion) {
         b.iter(|| {
             let s = format!(
                 r#"{{"application":"{}","cursor":{}}}"#,
-                black_box("liquidity"),
+                black_box("hanzo"),
                 black_box(42u64)
             );
             black_box(s.into_bytes());
@@ -34,11 +34,11 @@ fn bench_keys_subscribe_encode(c: &mut Criterion) {
 
 fn bench_keys_subscribe_decode(c: &mut Criterion) {
     let bytes = keys_subscribe::Writer {
-        application: "liquidity".to_string(),
+        application: "hanzo".to_string(),
         cursor: 42,
     }
     .to_bytes();
-    let json = br#"{"application":"liquidity","cursor":42}"#;
+    let json = br#"{"application":"hanzo","cursor":42}"#;
 
     let mut g = c.benchmark_group("decode/keys_subscribe");
     g.throughput(Throughput::Elements(1));
@@ -76,7 +76,7 @@ fn bench_keys_snapshot_encode_with_payload(c: &mut Criterion) {
     g.bench_function("zap", |b| {
         b.iter(|| {
             let bytes = keys_snapshot::Writer {
-                application: "liquidity".to_string(),
+                application: "hanzo".to_string(),
                 seq: 1,
                 jwks_json: jwks.to_vec(),
             }
