@@ -1,4 +1,4 @@
-# LLM.md - Hanzo Zap (deprecated)
+# Hanzo Zap (deprecated)
 
 ## Status
 
