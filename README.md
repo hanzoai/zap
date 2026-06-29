@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="zap" width="880"></p>
+
 # Hanzo ZAP
 
 ZAP — **Zero-copy Application Protocol**. Cap'n-Proto-style binary RPC
