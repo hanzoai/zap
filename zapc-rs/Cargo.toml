@@ -4,6 +4,9 @@ version = "1.0.0"
 edition = "2021"
 description = "ZAP schema compiler — parses .zap schema files and emits Rust readers/writers."
 license = "MIT"
+repository = "https://github.com/hanzoai/zap"
+keywords = ["zap", "schema", "codegen", "compiler"]
+categories = ["development-tools", "encoding"]
 
 # Used as a library from build.rs and as a CLI binary for ad-hoc
 # generation. Both surfaces share the same Parser → Codegen pipeline.

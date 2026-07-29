@@ -3,8 +3,9 @@
 //! Every constant below is the VERBATIM hex output of
 //! `github.com/zap-proto/go@v1.8.2`'s `rpc.BuildRequest` /
 //! `rpc.BuildResponse` for the stated inputs. Regenerate with
-//! `tests/gen_golden.go` (see the file header) and paste — never
-//! hand-edit. If Go changes the envelope, these fail here; if Rust
+//! `go run ./interop/golden`, which prints these exact `const` lines —
+//! paste them and never hand-edit. If Go changes the envelope, these
+//! fail here; if Rust
 //! changes it, these fail here too. That is the point.
 
 use zapwire::rpc::{self, Call, NO_TARGET, STATUS_NOT_FOUND, STATUS_OK};

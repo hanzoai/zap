@@ -28,7 +28,11 @@ async-trait  = "0.1"
 thiserror    = "2"
 
 [build-dependencies]
-zapc = { path = "../zapc-rs" }
+# Both a path AND a version: the path is what the workspace builds
+# against, the version is what a published `zapwire` resolves from
+# crates.io. Without the version `cargo publish` refuses the manifest
+# outright, which is why the rename could not actually ship before.
+zapc = { path = "../zapc-rs", version = "1.0.0" }
 
 [dev-dependencies]
 tokio    = { version = "1", features = ["full", "test-util"] }
