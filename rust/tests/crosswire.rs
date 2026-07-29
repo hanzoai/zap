@@ -7,8 +7,8 @@
 //! hand-edit. If Go changes the envelope, these fail here; if Rust
 //! changes it, these fail here too. That is the point.
 
-use zap::rpc::{self, Call, NO_TARGET, STATUS_NOT_FOUND, STATUS_OK};
-use zap::{Message, HEADER_SIZE};
+use zapwire::rpc::{self, Call, NO_TARGET, STATUS_NOT_FOUND, STATUS_OK};
+use zapwire::{Message, HEADER_SIZE};
 
 /// rpc.Call{Method: 7, PromiseID: 1, Target: NO_TARGET, Cap: "cap-token", Payload: "hello-zap"}
 const GO_REQ: &str = "5a415000020000c8100000003e000000070000000100000000000000100000000900000011000000090000006361702d746f6b656e68656c6c6f2d7a6170";
@@ -140,7 +140,7 @@ fn go_envelope_is_version2_router_tagged() {
 fn reads_a_go_envelope_off_a_stream() {
     let bytes = unhex(GO_REQ);
     let mut cur = std::io::Cursor::new(&bytes);
-    let (hdr, body) = zap::read_frame(&mut cur).expect("must read the Go rpc envelope");
+    let (hdr, body) = zapwire::read_frame(&mut cur).expect("must read the Go rpc envelope");
     assert_eq!(hdr.version, 2);
     assert_eq!(hdr.size as usize, bytes.len());
     assert_eq!(body.len(), bytes.len() - HEADER_SIZE);

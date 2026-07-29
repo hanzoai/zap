@@ -27,10 +27,10 @@
 //! ## One round trip, end to end
 //!
 //! ```no_run
-//! use zap::rpc::{build_response, parse_request, STATUS_OK};
-//! use zap::transport::{Conn, Server};
+//! use zapwire::rpc::{build_response, parse_request, STATUS_OK};
+//! use zapwire::transport::{Conn, Server};
 //!
-//! # async fn demo() -> Result<(), zap::WireError> {
+//! # async fn demo() -> Result<(), zapwire::WireError> {
 //! let srv = Server::listen("/run/hanzo/app.sock", |_| {
 //!     |env: &[u8]| {
 //!         let call = parse_request(env)?;
@@ -65,7 +65,7 @@ pub use wire::{Flags, Header, WireError, HEADER_SIZE, MAGIC, MAX_SIZE, VERSION, 
 
 /// Generated bindings — `init`, `push`, `keys_snapshot`, etc. Each
 /// produced by zapc (../zapc-rs) at build time from `schema/zap.zap`.
-/// Re-exported so callers can `use zap::proto::keys_snapshot;` without
+/// Re-exported so callers can `use zapwire::proto::keys_snapshot;` without
 /// poking at the include path.
 pub mod proto {
     pub use super::schema::*;

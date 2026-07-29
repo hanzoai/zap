@@ -1,7 +1,7 @@
 @0xc0a8b5e0e5f0a000;
 
 # Canonical ZAP schema. Compiled by zapc (../zapc-rs) at build time
-# into `OUT_DIR/zap_schema.rs`, surfaced via `zap::proto`.
+# into `OUT_DIR/zap_schema.rs`, surfaced via `zapwire::proto`.
 #
 # Layout policy: fields packed in declaration order with primitive
 # alignment, struct slot region 8-byte aligned. Text/Data fields use

@@ -1,6 +1,6 @@
 [package]
-name = "zap-proto"
-version = "1.0.1"
+name = "zapwire"
+version = "1.0.0"
 edition = "2021"
 description = "ZAP — Zero-copy Application Protocol. Wire-compatible with github.com/zap-proto/go: message codec, RPC envelope with promise pipelining, and a client/server transport."
 license = "MIT"
@@ -8,12 +8,16 @@ repository = "https://github.com/hanzoai/zap"
 keywords = ["zap", "rpc", "binary-protocol", "zero-copy"]
 categories = ["network-programming", "encoding"]
 
-# Published as `zap-proto`, imported as `zap` — the same split the Go
-# module has (github.com/zap-proto/go, package zap). The crates.io name
-# `zap` belongs to an unrelated project, and `hanzo-zap` belongs to a
-# DIFFERENT codebase (hanzo/net/hanzo-zap, published 0.6.75, pinned by
-# hanzo-node and the engine forks). One name, one codebase — so this
-# one does not take a name another codebase already publishes.
+# `zapwire` is the ZAP WIRE RUNTIME: header, data segment, call
+# envelope, transport. The name is deliberate — every shorter one in the
+# family already belongs to a different codebase, and one name must mean
+# one thing:
+#   zap         — an unrelated crates.io project
+#   hanzo-zap   — hanzo/net/hanzo-zap, published 0.6.75, pinned by
+#                 hanzo-node and the engine forks
+#   zap-proto   — a reservation OWNED AND PUBLISHED by zap-proto/spec
+#                 (see its reserve/zap-proto + release.yml), pointing at
+#   zap-schema  — the schema compiler, whose lib is also imported as `zap`
 #
 # Schema-generated readers/writers come from our own zapc compiler
 # (path = ../zapc-rs) — no upstream Cap'n Proto dependency.
@@ -35,5 +39,5 @@ name = "wire"
 harness = false
 
 [lib]
-name = "zap"
+name = "zapwire"
 path = "src/lib.rs"

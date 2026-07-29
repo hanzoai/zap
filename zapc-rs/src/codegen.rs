@@ -2,7 +2,7 @@
 //!
 //! For each struct we emit a `<Name>Reader<'a>` (zero-copy view into a
 //! byte slice) and a `<Name>Writer` (allocating builder that produces
-//! the wire bytes). The output references `zap::wire` for the
+//! the wire bytes). The output references `zapwire::wire` for the
 //! shared header constants and assumes the standard ZAP framing (the
 //! ZAP header is added by `wire::write_frame`, not the generated code).
 
@@ -93,7 +93,7 @@ fn emit_struct(out: &mut String, st: &Struct) {
     .ok();
     writeln!(
         out,
-        "        /// (Wrap with `zap::wire::write_frame` to add the 16-byte header.)"
+        "        /// (Wrap with `zapwire::wire::write_frame` to add the 16-byte header.)"
     )
     .ok();
     writeln!(out, "        pub fn to_bytes(&self) -> Vec<u8> {{").ok();

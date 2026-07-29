@@ -743,22 +743,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "zap-proto"
-version = "1.0.1"
+name = "zapc"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+]
+
+[[package]]
+name = "zapwire"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "criterion",
  "thiserror",
  "tokio",
  "zapc",
-]
-
-[[package]]
-name = "zapc"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "thiserror",
 ]
 
 [[package]]

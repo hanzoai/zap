@@ -13,8 +13,8 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
-use zap::rpc::{STATUS_NOT_FOUND, STATUS_OK};
-use zap::transport::Conn;
+use zapwire::rpc::{STATUS_NOT_FOUND, STATUS_OK};
+use zapwire::transport::Conn;
 
 /// The repo root — `rust/`'s parent, where `interop/` and `go.mod` live.
 fn repo_root() -> PathBuf {

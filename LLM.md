@@ -3,7 +3,7 @@
 ## What this repo IS
 
 The **Rust runtime for the ZAP protocol**, published to crates.io as
-**`zap-proto`** and imported as `zap`. Two crates ship as a unit:
+**`zapwire`**. Two crates ship as a unit:
 
 - `rust/` — the runtime: `wire` (header) · `codec` (data segment) ·
   `rpc` (call envelope + promise pipelining) · `transport` (Conn/Server).
@@ -33,13 +33,19 @@ suite; it is not shipped.
 
 Resolution:
 
-1. **This repo renamed to `zap-proto`** (a crates.io name we already
-   own; 1.0.0 was a reservation, so 1.0.1 is latest+1 patch). Imported
-   as `zap`, mirroring `github.com/zap-proto/go` / package `zap`.
-2. **`zap-proto/spec` retired its Rust crate.** 12 of its 14 Rust files
-   were byte-identical to `hanzo/net/hanzo-zap`; the two that differed
-   were a stub `lib.rs` and a 26-line stub `server.rs`. A spec repo
-   ships a spec, not a runtime.
+1. **This repo renamed to `zapwire`** — a free name, and the accurate
+   one: this crate is the wire runtime. NOT `zap-proto`: that is a
+   reservation `zap-proto/spec` owns and publishes from
+   `reserve/zap-proto` via its `release.yml`, pointing at `zap-schema`.
+   Taking it would have recreated the very bug being fixed. Lib name is
+   `zapwire` too, so it can share a dependency graph with `zap-schema`
+   (whose lib is `zap`).
+2. **`zap-proto/spec` already fixed itself.** Its crate is now
+   `zap-schema` 1.0.0; it no longer publishes `hanzo-zap`. The local
+   `~/work/zap/spec` checkout is 26 commits behind on a stale `master`
+   branch — reading it instead of the remote would have "retired" 26
+   commits of live work, including a Rust `cap` capability runtime.
+   Nothing to do there: `git fetch` before you judge a repo.
 3. **`hanzo-zap` stays with `hanzo/net/hanzo-zap`** — it published the
    max version and has the real consumers. 0.2.1 is NOT yanked: ~25
    engine forks pin it exactly, and yanking would break their resolve.
@@ -57,7 +63,7 @@ published.
   `rpc.BuildResponse`. Rust must both parse those bytes and emit them.
 - `rust/tests/interop.rs` — builds and runs `interop/main.go` (a real
   `transport.Listen` server) on a Unix socket and drives it from
-  `zap::transport::Conn`. This is what pins BEHAVIOUR: framing,
+  `zapwire::transport::Conn`. This is what pins BEHAVIOUR: framing,
   direction tag, PromiseID correlation, connection lifecycle.
 
 The gap that made this necessary: the Rust reader accepted wire version

@@ -7,18 +7,18 @@ reference (`github.com/zap-proto/go`) and the TypeScript reference
 
 | | |
 |---|---|
-| crate | **`zap-proto`** (imported as `zap`) |
+| crate | **`zapwire`** |
 | path | `rust/` |
 | proof | `rust/tests/crosswire.rs` (Go's bytes) · `rust/tests/interop.rs` (a live Go peer) |
 
 ```toml
 [dependencies]
-zap-proto = "1.0"
+zapwire = "1.0"
 ```
 
 ```rust
-use zap::rpc::{build_response, parse_request, STATUS_OK};
-use zap::transport::{Conn, Server};
+use zapwire::rpc::{build_response, parse_request, STATUS_OK};
+use zapwire::transport::{Conn, Server};
 
 let srv = Server::listen("/run/hanzo/app.sock", |_| {
     |env: &[u8]| {
@@ -31,14 +31,25 @@ let conn = Conn::connect(srv.addr()).await?;
 let answer = conn.invoke(1, &[], b"ping").await?;   // -> b"ping"
 ```
 
-## Why `zap-proto` and not `hanzo-zap`
+## Why `zapwire`
 
-`hanzo-zap` on crates.io is a DIFFERENT codebase — `hanzo/net/hanzo-zap`,
-published at 0.6.75, pinned by `hanzo-node` and the engine forks. This
-runtime once declared that same name while never publishing under it,
-which is how one name ends up meaning two things. It now publishes as
-`zap-proto`, imported as `zap` — the same split the Go module has
-(`github.com/zap-proto/go`, package `zap`). One name, one codebase.
+One name must mean one thing, and every shorter name in this family
+already means something else:
+
+| name | who owns it |
+|---|---|
+| `zap` | an unrelated crates.io project |
+| `hanzo-zap` | `hanzo/net/hanzo-zap` — published 0.6.75, pinned by `hanzo-node` and the engine forks |
+| `zap-proto` | a reservation OWNED AND PUBLISHED by `zap-proto/spec` (`reserve/zap-proto`, published by its `release.yml`) |
+| `zap-schema` | the ZAP schema compiler, in `zap-proto/spec`; its lib is also imported as `zap` |
+
+This crate is the WIRE RUNTIME — header, data segment, call envelope,
+transport — so it is `zapwire`, and its lib name is `zapwire` too, which
+keeps it able to sit in the same dependency graph as `zap-schema`.
+
+It previously declared `hanzo-zap` while never publishing under it: a
+name owned by one codebase and claimed by another is exactly how a
+collision starts.
 
 ## The four layers
 
