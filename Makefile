@@ -11,6 +11,7 @@
 test:
 	cd rust && cargo fmt --all -- --check
 	cd rust && cargo test --all-targets
+	cd rust && cargo test --doc
 	go vet ./...
 
 fmt:

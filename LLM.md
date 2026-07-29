@@ -3,7 +3,8 @@
 ## What this repo IS
 
 The **Rust runtime for the ZAP protocol**, published to crates.io as
-**`zapwire`**. Two crates ship as a unit:
+**`zapwire` 1.0.0** (depends on **`zapc` 1.0.0**). Two crates ship as a
+unit:
 
 - `rust/` — the runtime: `wire` (header) · `codec` (data segment) ·
   `rpc` (call envelope + promise pipelining) · `transport` (Conn/Server).
@@ -28,7 +29,7 @@ suite; it is not shipped.
 |---|---|---|
 | `hanzo-zap` 0.6.75 (max) | `~/work/hanzo/net/hanzo-zap` (repo hanzonet/network) | published; pinned by `hanzo-node` + `hanzo/net` |
 | `hanzo-zap` 0.2.1 | `~/work/zap/spec` (repo zap-proto/spec) | published; `Client::connect` / `call_tool` were TODO stubs |
-| `hanzo-zap` 1.0.1 | THIS repo, `rust/` | **never published** — declared the name without owning it |
+| `hanzo-zap` 1.0.1 | THIS repo, `rust/` | never published — declared the name without owning it; **now shipped as `zapwire` 1.0.0** |
 | `hanzo-zap` (no version) | `~/work/hanzo/evm/crates/hanzo-zap` | private path crate, never published |
 
 Resolution:
@@ -50,17 +51,31 @@ Resolution:
    max version and has the real consumers. 0.2.1 is NOT yanked: ~25
    engine forks pin it exactly, and yanking would break their resolve.
 
-Still open (hand-off): `hanzo/evm/crates/hanzo-zap` is a fourth crate
-with the same name. It is path-only, so nothing resolves it from the
-registry — but two crates with one name still cannot coexist in one
-cargo graph, so the evm one should be renamed before either is
-published.
+Still open (hand-offs — both OUTSIDE this repo):
+
+- **crates.io still credits `hanzo-zap` to THIS repo.** The crate-level
+  `repository` link is taken from the most recently PUBLISHED version,
+  not the highest one: 0.2.1 shipped 2026-06-23 declaring
+  `repository = hanzoai/zap`, while max_version 0.6.75 shipped
+  2026-05-13 declaring `hanzonet/network`. So anyone reading
+  crates.io/crates/hanzo-zap is sent to this repo for a crate whose
+  real source is `hanzo/net`. This repo can no longer fix that — it has
+  vacated the name. The repair is for `hanzo/net` to publish
+  `hanzo-zap` 0.6.76 (patch, latest+1), which re-points the link to
+  hanzonet/network. Yanking 0.2.1 is NOT the fix: ~25 engine forks pin
+  it exactly and would fail to resolve.
+- **`hanzo/evm/crates/hanzo-zap`** is a fourth crate with the same name.
+  It is path-only, so nothing resolves it from the registry — but two
+  crates with one name still cannot coexist in one cargo graph, so the
+  evm one should be renamed before either is published.
 
 ## Wire agreement with Go — how it is proved
 
 - `rust/tests/crosswire.rs` — golden hex generated FROM
   `github.com/zap-proto/go@v1.8.2`'s `rpc.BuildRequest` /
   `rpc.BuildResponse`. Rust must both parse those bytes and emit them.
+  Regenerate with `go run ./interop/golden`, which prints the finished
+  Rust `const` lines — never hand-edit the hex.
 - `rust/tests/interop.rs` — builds and runs `interop/main.go` (a real
   `transport.Listen` server) on a Unix socket and drives it from
   `zapwire::transport::Conn`. This is what pins BEHAVIOUR: framing,
@@ -85,8 +100,15 @@ server PUSH does work, via the symmetric connection.
 
 ## Test gate
 
-`make test` → `cargo fmt --check` + `cargo test` (which includes the Go
-interop peer). `cargo clippy` currently fails on this machine with
+`make test` → `cargo fmt --check` + `cargo test --all-targets` +
+`cargo test --doc` + `go vet ./...`. Currently 27 lib + 10 crosswire +
+2 live-Go interop + 1 doctest. `.github/workflows/test.yml` runs
+`make test` itself — one gate, not a CI-only copy of one — with Go
+installed so the interop test can never silently skip.
+
+`--doc` is a SEPARATE line because `--all-targets` does not imply it:
+with only `--all-targets` a doctest that fails to compile ships green.
+`cargo clippy` currently fails on this machine with
 `multiple input filenames provided` from the rustup clippy shim — an
 environment fault, not a code fault; it is not part of the gate until
 that is fixed.
