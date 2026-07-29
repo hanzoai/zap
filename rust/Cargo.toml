@@ -1,28 +1,27 @@
 [package]
-name = "hanzo-zap"
+name = "zap-proto"
 version = "1.0.1"
 edition = "2021"
-description = "ZAP — Zero-copy Application Protocol. Hand-rolled little-endian binary, schema bindings via zapc."
+description = "ZAP — Zero-copy Application Protocol. Wire-compatible with github.com/zap-proto/go: message codec, RPC envelope with promise pipelining, and a client/server transport."
 license = "MIT"
 repository = "https://github.com/hanzoai/zap"
 keywords = ["zap", "rpc", "binary-protocol", "zero-copy"]
 categories = ["network-programming", "encoding"]
 
-# 1.0.0 was a JSON-payload-in-binary-frame WebSocket prototype that
-# never shipped. 1.0.1 is the canonical Rust impl: hand-rolled
-# little-endian binary, byte-for-byte aligned with the Go reference at
-# github.com/luxfi/zap and the TS @zap-proto/zap. Schema-generated
-# readers/writers come from our own zapc compiler (path = ../zapc-rs)
-# — no upstream Cap'n Proto dependency.
+# Published as `zap-proto`, imported as `zap` — the same split the Go
+# module has (github.com/zap-proto/go, package zap). The crates.io name
+# `zap` belongs to an unrelated project, and `hanzo-zap` belongs to a
+# DIFFERENT codebase (hanzo/net/hanzo-zap, published 0.6.75, pinned by
+# hanzo-node and the engine forks). One name, one codebase — so this
+# one does not take a name another codebase already publishes.
+#
+# Schema-generated readers/writers come from our own zapc compiler
+# (path = ../zapc-rs) — no upstream Cap'n Proto dependency.
 
 [dependencies]
-tokio        = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "sync", "signal", "time"] }
-futures-util = "0.3"
+tokio        = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "sync", "time"] }
 async-trait  = "0.1"
-log          = "0.4"
-anyhow       = "1.0"
 thiserror    = "2"
-env_logger   = "0.11"
 
 [build-dependencies]
 zapc = { path = "../zapc-rs" }
@@ -35,10 +34,6 @@ criterion = { version = "0.5", features = ["html_reports"] }
 name = "wire"
 harness = false
 
-[[bin]]
-name = "hanzo-zap"
-path = "src/main.rs"
-
 [lib]
-name = "hanzo_zap"
+name = "zap"
 path = "src/lib.rs"

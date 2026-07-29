@@ -210,7 +210,10 @@ impl<'a> Parser<'a> {
         self.expect("@")?;
         let r = self.rest();
         if !r.starts_with("0x") {
-            return Err(Error::Parse(self.pos_string(), "file id needs 0x prefix".into()));
+            return Err(Error::Parse(
+                self.pos_string(),
+                "file id needs 0x prefix".into(),
+            ));
         }
         self.pos += 2;
         let r = self.rest();
@@ -223,10 +226,13 @@ impl<'a> Parser<'a> {
             }
         }
         if end == 0 {
-            return Err(Error::Parse(self.pos_string(), "expected hex digits for file id".into()));
+            return Err(Error::Parse(
+                self.pos_string(),
+                "expected hex digits for file id".into(),
+            ));
         }
-        let id =
-            u64::from_str_radix(&r[..end], 16).map_err(|e| Error::Parse(self.pos_string(), e.to_string()))?;
+        let id = u64::from_str_radix(&r[..end], 16)
+            .map_err(|e| Error::Parse(self.pos_string(), e.to_string()))?;
         self.pos += end;
         self.skip_whitespace_and_comments();
         self.expect(";")?;
@@ -263,7 +269,11 @@ impl<'a> Parser<'a> {
         }
         let slot_size = (offset + 7) & !7;
 
-        Ok(Struct { name, fields, slot_size })
+        Ok(Struct {
+            name,
+            fields,
+            slot_size,
+        })
     }
 
     fn parse_field(&mut self) -> Result<Field> {
@@ -280,9 +290,14 @@ impl<'a> Parser<'a> {
             }
         }
         if end == 0 {
-            return Err(Error::Parse(self.pos_string(), "expected field index".into()));
+            return Err(Error::Parse(
+                self.pos_string(),
+                "expected field index".into(),
+            ));
         }
-        let index: u16 = r[..end].parse().map_err(|e: std::num::ParseIntError| Error::Parse(self.pos_string(), e.to_string()))?;
+        let index: u16 = r[..end]
+            .parse()
+            .map_err(|e: std::num::ParseIntError| Error::Parse(self.pos_string(), e.to_string()))?;
         self.pos += end;
         self.skip_whitespace_and_comments();
         self.expect(":")?;
@@ -313,7 +328,12 @@ impl<'a> Parser<'a> {
         self.skip_whitespace_and_comments();
         self.expect(";")?;
 
-        Ok(Field { name, index, ty, offset: 0 })
+        Ok(Field {
+            name,
+            index,
+            ty,
+            offset: 0,
+        })
     }
 }
 
@@ -349,9 +369,9 @@ mod tests {
         "#;
         let s = parse(src).unwrap();
         let m = &s.structs[0];
-        assert_eq!(m.fields[0].offset, 0);  // u8 at 0
-        assert_eq!(m.fields[1].offset, 4);  // u32 aligned to 4
-        assert_eq!(m.fields[2].offset, 8);  // text slot at 8
-        assert_eq!(m.slot_size, 16);        // 8-byte aligned total
+        assert_eq!(m.fields[0].offset, 0); // u8 at 0
+        assert_eq!(m.fields[1].offset, 4); // u32 aligned to 4
+        assert_eq!(m.fields[2].offset, 8); // text slot at 8
+        assert_eq!(m.slot_size, 16); // 8-byte aligned total
     }
 }

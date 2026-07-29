@@ -11,13 +11,7 @@ fn main() -> Result<()> {
     let mut iter = args.into_iter();
     while let Some(a) = iter.next() {
         match a.as_str() {
-            "-o" => {
-                output = Some(
-                    iter.next()
-                        .context("`-o` requires an output path")?
-                        .into(),
-                )
-            }
+            "-o" => output = Some(iter.next().context("`-o` requires an output path")?.into()),
             "-h" | "--help" => {
                 print_help();
                 return Ok(());

@@ -2,7 +2,7 @@
 //!
 //! For each struct we emit a `<Name>Reader<'a>` (zero-copy view into a
 //! byte slice) and a `<Name>Writer` (allocating builder that produces
-//! the wire bytes). The output references `hanzo_zap::wire` for the
+//! the wire bytes). The output references `zap::wire` for the
 //! shared header constants and assumes the standard ZAP framing (the
 //! ZAP header is added by `wire::write_frame`, not the generated code).
 
@@ -31,19 +31,38 @@ pub fn emit_rust(schema: &Schema) -> String {
 
 fn emit_struct(out: &mut String, st: &Struct) {
     let name = &st.name;
-    writeln!(out, "// ── {} ────────────────────────────────────────", name).ok();
+    writeln!(
+        out,
+        "// ── {} ────────────────────────────────────────",
+        name
+    )
+    .ok();
     writeln!(out, "pub mod {} {{", to_snake(name)).ok();
     writeln!(out, "    use super::*;").ok();
     writeln!(out, "    pub const SLOT_SIZE: usize = {};", st.slot_size).ok();
 
     // Reader
-    writeln!(out, "    /// Zero-copy view into the {} slot region of the data segment.", name).ok();
+    writeln!(
+        out,
+        "    /// Zero-copy view into the {} slot region of the data segment.",
+        name
+    )
+    .ok();
     writeln!(out, "    #[derive(Debug, Clone, Copy)]").ok();
     writeln!(out, "    pub struct Reader<'a> {{ pub buf: &'a [u8] }}").ok();
     writeln!(out, "    impl<'a> Reader<'a> {{").ok();
-    writeln!(out, "        pub fn from_slice(buf: &'a [u8]) -> Result<Self, WireError> {{").ok();
+    writeln!(
+        out,
+        "        pub fn from_slice(buf: &'a [u8]) -> Result<Self, WireError> {{"
+    )
+    .ok();
     writeln!(out, "            if buf.len() < {} {{", st.slot_size).ok();
-    writeln!(out, "                return Err(WireError::ShortBody {{ want: {}, got: buf.len() }});", st.slot_size).ok();
+    writeln!(
+        out,
+        "                return Err(WireError::ShortBody {{ want: {}, got: buf.len() }});",
+        st.slot_size
+    )
+    .ok();
     writeln!(out, "            }}").ok();
     writeln!(out, "            Ok(Self {{ buf }})").ok();
     writeln!(out, "        }}").ok();
@@ -67,8 +86,16 @@ fn emit_struct(out: &mut String, st: &Struct) {
     writeln!(out, "    }}").ok();
 
     writeln!(out, "    impl Writer {{").ok();
-    writeln!(out, "        /// Serialise to the canonical ZAP body bytes.").ok();
-    writeln!(out, "        /// (Wrap with `hanzo_zap::wire::write_frame` to add the 16-byte header.)").ok();
+    writeln!(
+        out,
+        "        /// Serialise to the canonical ZAP body bytes."
+    )
+    .ok();
+    writeln!(
+        out,
+        "        /// (Wrap with `zap::wire::write_frame` to add the 16-byte header.)"
+    )
+    .ok();
     writeln!(out, "        pub fn to_bytes(&self) -> Vec<u8> {{").ok();
     // Single-pass: pre-size one buffer to slot + payload + 8-byte tail
     // pad. Each Text/Data field appends its bytes to the same buffer
@@ -76,13 +103,21 @@ fn emit_struct(out: &mut String, st: &Struct) {
     writeln!(out, "            let payload_len: usize = 0").ok();
     for f in &st.fields {
         match f.ty {
-            FieldType::Text => writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok(),
-            FieldType::Data => writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok(),
+            FieldType::Text => {
+                writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok()
+            }
+            FieldType::Data => {
+                writeln!(out, "                + self.{}.len()", to_snake(&f.name)).ok()
+            }
             _ => None,
         };
     }
     writeln!(out, "                ;").ok();
-    writeln!(out, "            let total = (SLOT_SIZE + payload_len + 7) & !7;").ok();
+    writeln!(
+        out,
+        "            let total = (SLOT_SIZE + payload_len + 7) & !7;"
+    )
+    .ok();
     writeln!(out, "            let mut buf = vec![0u8; total];").ok();
     writeln!(out, "            let mut tail_off = SLOT_SIZE;").ok();
     for f in &st.fields {
@@ -101,13 +136,28 @@ fn emit_reader_method(out: &mut String, f: &crate::parser::Field) {
     let off = f.offset;
     match f.ty {
         FieldType::Bool => {
-            writeln!(out, "        pub fn {}(&self) -> bool {{ self.buf[{}] != 0 }}", snake, off).ok();
+            writeln!(
+                out,
+                "        pub fn {}(&self) -> bool {{ self.buf[{}] != 0 }}",
+                snake, off
+            )
+            .ok();
         }
         FieldType::UInt8 => {
-            writeln!(out, "        pub fn {}(&self) -> u8 {{ self.buf[{}] }}", snake, off).ok();
+            writeln!(
+                out,
+                "        pub fn {}(&self) -> u8 {{ self.buf[{}] }}",
+                snake, off
+            )
+            .ok();
         }
         FieldType::Int8 => {
-            writeln!(out, "        pub fn {}(&self) -> i8 {{ self.buf[{}] as i8 }}", snake, off).ok();
+            writeln!(
+                out,
+                "        pub fn {}(&self) -> i8 {{ self.buf[{}] as i8 }}",
+                snake, off
+            )
+            .ok();
         }
         FieldType::UInt16 => {
             writeln!(out, "        pub fn {}(&self) -> u16 {{ u16::from_le_bytes([self.buf[{}], self.buf[{}]]) }}", snake, off, off + 1).ok();
@@ -136,14 +186,31 @@ fn emit_reader_method(out: &mut String, f: &crate::parser::Field) {
         FieldType::Text => {
             writeln!(out, "        pub fn {}(&self) -> &'a str {{", snake).ok();
             writeln!(out, "            let bytes = self.{}_bytes();", snake).ok();
-            writeln!(out, "            std::str::from_utf8(bytes).unwrap_or(\"\")").ok();
+            writeln!(
+                out,
+                "            std::str::from_utf8(bytes).unwrap_or(\"\")"
+            )
+            .ok();
             writeln!(out, "        }}").ok();
             writeln!(out, "        pub fn {}_bytes(&self) -> &'a [u8] {{", snake).ok();
             writeln!(out, "            let rel = i32::from_le_bytes(self.buf[{}..{}].try_into().unwrap()) as isize;", off, off + 4).ok();
             writeln!(out, "            let len = u32::from_le_bytes(self.buf[{}..{}].try_into().unwrap()) as usize;", off + 4, off + 8).ok();
-            writeln!(out, "            if rel == 0 || len == 0 {{ return b\"\"; }}").ok();
-            writeln!(out, "            let start = ({} as isize + rel) as usize;", off).ok();
-            writeln!(out, "            if start + len > self.buf.len() {{ return b\"\"; }}").ok();
+            writeln!(
+                out,
+                "            if rel == 0 || len == 0 {{ return b\"\"; }}"
+            )
+            .ok();
+            writeln!(
+                out,
+                "            let start = ({} as isize + rel) as usize;",
+                off
+            )
+            .ok();
+            writeln!(
+                out,
+                "            if start + len > self.buf.len() {{ return b\"\"; }}"
+            )
+            .ok();
             writeln!(out, "            &self.buf[start..start + len]").ok();
             writeln!(out, "        }}").ok();
         }
@@ -151,9 +218,22 @@ fn emit_reader_method(out: &mut String, f: &crate::parser::Field) {
             writeln!(out, "        pub fn {}(&self) -> &'a [u8] {{", snake).ok();
             writeln!(out, "            let rel = i32::from_le_bytes(self.buf[{}..{}].try_into().unwrap()) as isize;", off, off + 4).ok();
             writeln!(out, "            let len = u32::from_le_bytes(self.buf[{}..{}].try_into().unwrap()) as usize;", off + 4, off + 8).ok();
-            writeln!(out, "            if rel == 0 || len == 0 {{ return b\"\"; }}").ok();
-            writeln!(out, "            let start = ({} as isize + rel) as usize;", off).ok();
-            writeln!(out, "            if start + len > self.buf.len() {{ return b\"\"; }}").ok();
+            writeln!(
+                out,
+                "            if rel == 0 || len == 0 {{ return b\"\"; }}"
+            )
+            .ok();
+            writeln!(
+                out,
+                "            let start = ({} as isize + rel) as usize;",
+                off
+            )
+            .ok();
+            writeln!(
+                out,
+                "            if start + len > self.buf.len() {{ return b\"\"; }}"
+            )
+            .ok();
             writeln!(out, "            &self.buf[start..start + len]").ok();
             writeln!(out, "        }}").ok();
         }
@@ -165,18 +245,70 @@ fn emit_writer_set(out: &mut String, f: &crate::parser::Field) {
     let off = f.offset;
     let _ = match f.ty {
         FieldType::Bool => {
-            writeln!(out, "            buf[{}] = if self.{} {{ 1 }} else {{ 0 }};", off, snake)
+            writeln!(
+                out,
+                "            buf[{}] = if self.{} {{ 1 }} else {{ 0 }};",
+                off, snake
+            )
         }
         FieldType::UInt8 => writeln!(out, "            buf[{}] = self.{};", off, snake),
         FieldType::Int8 => writeln!(out, "            buf[{}] = self.{} as u8;", off, snake),
-        FieldType::UInt16 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 2, snake),
-        FieldType::Int16 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 2, snake),
-        FieldType::UInt32 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 4, snake),
-        FieldType::Int32 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 4, snake),
-        FieldType::Float32 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 4, snake),
-        FieldType::UInt64 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 8, snake),
-        FieldType::Int64 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 8, snake),
-        FieldType::Float64 => writeln!(out, "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());", off, off + 8, snake),
+        FieldType::UInt16 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 2,
+            snake
+        ),
+        FieldType::Int16 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 2,
+            snake
+        ),
+        FieldType::UInt32 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 4,
+            snake
+        ),
+        FieldType::Int32 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 4,
+            snake
+        ),
+        FieldType::Float32 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 4,
+            snake
+        ),
+        FieldType::UInt64 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 8,
+            snake
+        ),
+        FieldType::Int64 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 8,
+            snake
+        ),
+        FieldType::Float64 => writeln!(
+            out,
+            "            buf[{}..{}].copy_from_slice(&self.{}.to_le_bytes());",
+            off,
+            off + 8,
+            snake
+        ),
         FieldType::Text => write_var_field(out, &snake, off, /*as_bytes=*/ true),
         FieldType::Data => write_var_field(out, &snake, off, /*as_bytes=*/ false),
     };
@@ -188,15 +320,36 @@ fn emit_writer_set(out: &mut String, f: &crate::parser::Field) {
 fn write_var_field(out: &mut String, snake: &str, off: usize, as_bytes: bool) -> std::fmt::Result {
     writeln!(out, "            {{")?;
     if as_bytes {
-        writeln!(out, "                let bytes = self.{}.as_bytes();", snake)?;
+        writeln!(
+            out,
+            "                let bytes = self.{}.as_bytes();",
+            snake
+        )?;
     } else {
         writeln!(out, "                let bytes: &[u8] = &self.{};", snake)?;
     }
     writeln!(out, "                if !bytes.is_empty() {{")?;
-    writeln!(out, "                    let rel = (tail_off - {}) as i32;", off)?;
-    writeln!(out, "                    buf[{}..{}].copy_from_slice(&rel.to_le_bytes());", off, off + 4)?;
-    writeln!(out, "                    buf[{}..{}].copy_from_slice(&(bytes.len() as u32).to_le_bytes());", off + 4, off + 8)?;
-    writeln!(out, "                    buf[tail_off..tail_off + bytes.len()].copy_from_slice(bytes);")?;
+    writeln!(
+        out,
+        "                    let rel = (tail_off - {}) as i32;",
+        off
+    )?;
+    writeln!(
+        out,
+        "                    buf[{}..{}].copy_from_slice(&rel.to_le_bytes());",
+        off,
+        off + 4
+    )?;
+    writeln!(
+        out,
+        "                    buf[{}..{}].copy_from_slice(&(bytes.len() as u32).to_le_bytes());",
+        off + 4,
+        off + 8
+    )?;
+    writeln!(
+        out,
+        "                    buf[tail_off..tail_off + bytes.len()].copy_from_slice(bytes);"
+    )?;
     writeln!(out, "                    tail_off += bytes.len();")?;
     writeln!(out, "                }}")?;
     writeln!(out, "            }}")?;

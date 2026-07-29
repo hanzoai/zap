@@ -1,10 +1,20 @@
-.PHONY: tidy
+.PHONY: test fmt tidy
 
-# This repo no longer ships a binary. The former `cmd/zap-sidecar` has been
-# removed; ZAP is implemented natively inside each backend service (sql, kv,
-# docdb, datastore, etc.) and exposed on TCP/9999 by the service itself.
+# The gate. `cargo test` includes rust/tests/interop.rs, which builds
+# interop/main.go against github.com/zap-proto/go and drives a REAL Go
+# ZAP server from the Rust client — so wire agreement is proved, not
+# asserted. That test skips loudly if no Go toolchain is present.
 #
-# See README.md for the deprecation notice and migration history.
+# cargo clippy is deliberately NOT here yet: the rustup clippy shim
+# fails with "multiple input filenames provided" on this workspace's
+# build-dependency. Add it back once that is fixed.
+test:
+	cd rust && cargo fmt --all -- --check
+	cd rust && cargo test --all-targets
+	go vet ./interop
+
+fmt:
+	cd rust && cargo fmt --all
 
 tidy:
 	go mod tidy

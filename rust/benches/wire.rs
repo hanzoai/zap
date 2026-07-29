@@ -4,7 +4,7 @@
 //! on a single core; multiply by core count for a server estimate.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use hanzo_zap::schema::{keys_snapshot, keys_subscribe};
+use zap::schema::{keys_snapshot, keys_subscribe};
 
 fn bench_keys_subscribe_encode(c: &mut Criterion) {
     let mut g = c.benchmark_group("encode/keys_subscribe");

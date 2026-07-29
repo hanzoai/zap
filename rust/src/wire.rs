@@ -1,28 +1,22 @@
-//! ZAP binary wire format — header parser/builder.
+//! ZAP binary wire format — the message header, and framed message I/O.
 //!
-//! Aligned with `github.com/luxfi/zap@v0.2.0` (Go reference):
+//! Aligned with `github.com/zap-proto/go@v1.8.2` (the Go reference):
 //!
 //! ```text
 //! ┌─ Header (16 bytes) ────────────────────────────────────────────┐
 //! │  Magic       4  "ZAP\0"                                        │
-//! │  Version     2  u16 LE  (currently 1)                          │
+//! │  Version     2  u16 LE  (1 or 2 — both accepted)               │
 //! │  Flags       2  u16 LE  (compressed, encrypted, signed, …)     │
 //! │  RootOffset  4  u32 LE  offset to root within data segment     │
 //! │  Size        4  u32 LE  total message size including header    │
 //! └────────────────────────────────────────────────────────────────┘
 //! ┌─ Data segment (variable, 8-byte aligned) ──────────────────────┐
-//! │  Cap'n-Proto-style structs / lists / text / bytes              │
+//! │  structs / lists / text / bytes at fixed offsets                │
 //! └────────────────────────────────────────────────────────────────┘
 //! ```
 //!
-//! All multi-byte integers are little-endian. The data segment uses
-//! the canonical capnp segment layout (see `capnp::serialize`); the
-//! ZAP header is a thin extension that adds a magic+version self-check
-//! before handing the segment to capnp for zero-copy reads.
-//!
-//! The protocol is wire-compatible with the Go and TypeScript ZAP
-//! implementations. Rust callers should use `capnp::message::Reader`
-//! to walk the data segment with zero allocation.
+//! All multi-byte integers are little-endian. This module owns the
+//! HEADER only; [`crate::codec`] walks the data segment.
 
 use std::io::{self, Read, Write};
 
@@ -32,8 +26,18 @@ pub const MAGIC: [u8; 4] = [b'Z', b'A', b'P', 0];
 /// Header size in bytes.
 pub const HEADER_SIZE: usize = 16;
 
-/// Current protocol version.
+/// The wire version this runtime's [`crate::codec::Builder`] emits for a
+/// plain message. Two schema generations share one data-segment encoding
+/// and differ only in the meaning of the leading struct byte, so a reader
+/// ACCEPTS both — a consumer that needs a specific generation gates on
+/// [`Header::version`] after decoding.
 pub const VERSION: u16 = 1;
+
+/// The wire version the RPC call envelope and the transport framing use
+/// (see [`crate::rpc`]). Byte-identical data segment; only header byte 4
+/// differs. `github.com/zap-proto/go`'s `NewBuilderV2` emits this, so a
+/// reader that rejects it cannot read a single Go RPC envelope.
+pub const VERSION2: u16 = 2;
 
 /// Maximum message size — 16 MiB. Matches Go reference.
 pub const MAX_SIZE: usize = 16 * 1024 * 1024;
@@ -66,6 +70,8 @@ pub enum WireError {
     ShortHeader { want: usize, got: usize },
     #[error("zap: short read — body expects {want}, got {got}")]
     ShortBody { want: usize, got: usize },
+    #[error("zap: connection closed")]
+    Closed,
     #[error("zap: io: {0}")]
     Io(#[from] io::Error),
 }
@@ -103,7 +109,7 @@ impl Header {
             return Err(WireError::InvalidMagic);
         }
         let version = u16::from_le_bytes([buf[4], buf[5]]);
-        if version != VERSION {
+        if version != VERSION && version != VERSION2 {
             return Err(WireError::InvalidVersion(version));
         }
         let flags = Flags(u16::from_le_bytes([buf[6], buf[7]]));
@@ -124,12 +130,14 @@ impl Header {
     }
 }
 
-/// Read a complete ZAP message (header + data segment) from a reader.
-/// Returns the data-segment bytes ready to feed into `capnp::message::Reader`.
+/// Read one complete ZAP message (header + data segment) from a reader.
 ///
-/// Zero-copy is achieved at the capnp layer; this function still
-/// allocates a `Vec` for the body since `Read` doesn't promise an
-/// underlying slice. Use the async variant on TCP for pooled buffers.
+/// A ZAP message is SELF-DELIMITING — the header's `size` says how long
+/// it is — so this is all that is needed to pull messages off a stream,
+/// a file, or a pipe. [`crate::transport`] adds a length+direction
+/// prefix on top because a CONNECTION additionally has to say whether a
+/// message is a call or an answer; the message itself never carries
+/// that.
 pub fn read_frame<R: Read>(r: &mut R) -> Result<(Header, Vec<u8>), WireError> {
     let mut hdr_buf = [0u8; HEADER_SIZE];
     r.read_exact(&mut hdr_buf)?;
@@ -169,32 +177,6 @@ pub fn write_frame<W: Write>(
     Ok(())
 }
 
-/// Write a ZAP frame to an async writer. Used by `server::handle_conn`.
-pub async fn write_frame_async<W: tokio::io::AsyncWrite + Unpin>(
-    w: &mut W,
-    flags: Flags,
-    root_offset: u32,
-    body: &[u8],
-) -> Result<(), WireError> {
-    use tokio::io::AsyncWriteExt;
-    let total = HEADER_SIZE + body.len();
-    if total > MAX_SIZE {
-        return Err(WireError::SizeExceeded {
-            got: total,
-            max: MAX_SIZE,
-        });
-    }
-    let hdr = Header {
-        version: VERSION,
-        flags,
-        root_offset,
-        size: total as u32,
-    };
-    w.write_all(&hdr.encode()).await?;
-    w.write_all(body).await?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,7 +201,10 @@ mod tests {
     fn rejects_bad_magic() {
         let mut bytes = [0u8; HEADER_SIZE];
         bytes[0..4].copy_from_slice(b"NOPE");
-        assert!(matches!(Header::decode(&bytes), Err(WireError::InvalidMagic)));
+        assert!(matches!(
+            Header::decode(&bytes),
+            Err(WireError::InvalidMagic)
+        ));
     }
 
     #[test]
@@ -234,6 +219,22 @@ mod tests {
             Header::decode(&hdr.encode()),
             Err(WireError::InvalidVersion(99))
         ));
+    }
+
+    /// The Go RPC envelope is a v2 header. A reader that takes v1 only
+    /// cannot read a single call off the wire — this is the gap that
+    /// made the Rust side unable to talk to `zap-proto/go` at all.
+    #[test]
+    fn accepts_both_wire_versions() {
+        for v in [VERSION, VERSION2] {
+            let hdr = Header {
+                version: v,
+                flags: Flags::NONE,
+                root_offset: 16,
+                size: 24,
+            };
+            assert_eq!(Header::decode(&hdr.encode()).unwrap().version, v);
+        }
     }
 
     #[test]
