@@ -1,0 +1,17 @@
+# Canonical CI/CD config for hanzoai/zap — read by the hanzoai/ci reusable and
+# by platform.hanzo.ai.
+#
+# No `images:`. The Dockerfile was deleted in 8981699 when the zap-sidecar
+# binary went away and ZAP became native everywhere; the GitHub deploy lane
+# that built ghcr.io/hanzoai/zap kept firing at a path that no longer exists.
+#
+# The gate is `make test`, which is where the cross-language proof lives:
+# rust/tests/interop.rs drives a real Go ZAP peer, so a Go toolchain is not
+# optional — without one that test SKIPS and the proof silently stops running.
+# The reusable provisions Go from go.mod and Rust from Cargo.toml, so both are
+# present here.
+test:
+  - name: make test
+    run: |
+      set -euo pipefail
+      make test
