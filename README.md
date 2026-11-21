@@ -1,5 +1,7 @@
 # ZAP — Zero-copy Application Protocol (Rust)
 
+[![Open in Hanzo](https://hanzo.app/badges/open-in-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/zap&ref=main&action=open) [![Edit with Hanzo](https://hanzo.app/badges/edit-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/zap&ref=main&action=edit) [![Deploy with Hanzo](https://hanzo.app/badges/deploy-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/zap&ref=main&action=deploy)
+
 The Rust runtime for ZAP, the binary RPC used for service-to-service
 communication across the Hanzo / Lux stacks. Wire-compatible with the Go
 reference (`github.com/zap-proto/go`) and the TypeScript reference
